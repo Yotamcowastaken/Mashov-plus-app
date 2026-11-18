@@ -15,7 +15,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { SCRIPT, DEFAULTS, FUNNY_TEXT } from "./mp";
+import { SCRIPT, DEFAULTS, FUNNY_TEXT, ESS_TEXT } from "./mp";
 
 const STORE_KEY = "mp-store";
 const START_URL = "https://web.mashov.info/students/login";
@@ -26,6 +26,7 @@ export default function App() {
   const [open, setOpen] = useState(false);
   const [hex, setHex] = useState("");
   const [listKey, setListKey] = useState(0);
+  const [essKey, setEssKey] = useState(0);
   const web = useRef(null);
   const canGoBack = useRef(false);
 
@@ -46,10 +47,27 @@ export default function App() {
 
   const cfg = { ...DEFAULTS, ...(store || {}) };
 
+  const storeRef = useRef(null);
+  storeRef.current = store;
+  // שינוי שהגיע מתוך הדף (כוכבים ועריכה ב-Essentials): שומרים בלי לשלוח בחזרה
+  const onMessage = useCallback((ev) => {
+    let m;
+    try { m = JSON.parse(ev.nativeEvent.data); } catch (e) { return; }
+    const next = { ...(storeRef.current || {}) };
+    if (m.type === "set") Object.assign(next, m.patch);
+    else if (m.type === "remove") m.keys.forEach((k) => delete next[k]);
+    else return;
+    if (next.essList === ESS_TEXT) delete next.essList;
+    setStore(next);
+    setEssKey((k) => k + 1);
+    AsyncStorage.setItem(STORE_KEY, JSON.stringify(next)).catch(() => {});
+  }, []);
+
   const update = useCallback(
     (patch) => {
       const next = { ...(store || {}), ...patch };
       if (next.funnyList === FUNNY_TEXT) delete next.funnyList; // ברירת המחדל מתעדכנת לבד
+      if (next.essList === ESS_TEXT) delete next.essList;
       setStore(next);
       AsyncStorage.setItem(STORE_KEY, JSON.stringify(next)).catch(() => {});
       if (web.current) web.current.injectJavaScript(`window.__mpApply && window.__mpApply(${JSON.stringify(next)}); true;`);
@@ -82,6 +100,7 @@ export default function App() {
         sharedCookiesEnabled
         thirdPartyCookiesEnabled
         setSupportMultipleWindows={false}
+        onMessage={onMessage}
         onNavigationStateChange={(n) => { canGoBack.current = n.canGoBack; }}
         allowsBackForwardNavigationGestures
       />
@@ -140,6 +159,20 @@ export default function App() {
             <Row label="ניווט מהיר (☰)">
               <Switch value={cfg.nav} onValueChange={(v) => update({ nav: v })} />
             </Row>
+
+            <Text style={s.sub}>Essentials: כל שורה היא אייקון ושם הפריט המקורי בתפריט. אפשר גם ללחוץ ☆ ליד פריט בטאב "הכל".</Text>
+            <TextInput
+              key={"ess" + essKey}
+              style={[s.input, s.list, { minHeight: 120 }]}
+              multiline
+              defaultValue={cfg.essList}
+              onEndEditing={(e) => update({ essList: e.nativeEvent.text })}
+              autoCorrect={false}
+              textAlign="right"
+            />
+            <TouchableOpacity style={s.btn} onPress={() => { update({ essList: ESS_TEXT }); setEssKey((k) => k + 1); }}>
+              <Text style={s.btnT}>↩︎ אפס Essentials לברירת מחדל</Text>
+            </TouchableOpacity>
 
             <Row label="שמות מצחיקים">
               <Switch value={cfg.funny} onValueChange={(v) => update({ funny: v })} />
