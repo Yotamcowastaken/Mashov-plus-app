@@ -2,11 +2,17 @@
   "expo": {
     "name": "משו״ב פלוס",
     "slug": "mashov-plus",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "android": {
-      "package": "com.yotamco.mashovplus"
-    }
+      "package": "com.yotamco.mashovplus",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "versionCode": 2
+    },
+    "icon": "./assets/icon.png"
   }
 }

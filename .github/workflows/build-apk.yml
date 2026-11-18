@@ -27,6 +27,7 @@ jobs:
         run: |
           npx --yes create-expo-app@latest build --template blank --no-install
           cp App.js mp.js app.json build/
+          cp -r assets build/
 
       - name: Install dependencies
         working-directory: build
