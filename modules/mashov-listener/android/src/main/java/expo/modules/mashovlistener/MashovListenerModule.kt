@@ -88,6 +88,11 @@ class MashovListenerModule : Module() {
       }
     }
 
+    // מעביר את האפליקציה לרקע (כמו כפתור הבית), בלי לסגור אותה ובלי לאבד את החיבור למשוב
+    Function("moveToBack") {
+      appContext.currentActivity?.moveTaskToBack(true) ?: false
+    }
+
     Function("getLog") {
       context.getSharedPreferences(MashovNotificationService.PREFS, Context.MODE_PRIVATE).getString("log", "") ?: ""
     }

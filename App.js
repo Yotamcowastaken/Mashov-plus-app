@@ -40,7 +40,7 @@ Notifications.setNotificationHandler({
     shouldShowAlert: true,
   }),
 });
-const START_URL = "https://web.mashov.info/students/login";
+const START_URL = "https://web.mashov.info/students/main/dashboard"; // אם לא מחוברים, משוב מעביר לבד להתחברות
 const THEMES = [
   ["none", "ללא", null],
   ["space", "🌌 חלל", "#7c4dff"],
@@ -108,6 +108,7 @@ function Main() {
   const [ioMsg, setIoMsg] = useState("");
   const web = useRef(null);
   const canGoBack = useRef(false);
+  const urlsRef = useRef([]);
 
   useEffect(() => {
     (async () => {
@@ -183,7 +184,15 @@ function Main() {
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (open) { setOpen(false); return true; }
-      if (canGoBack.current && web.current) { web.current.goBack(); return true; }
+      const st = urlsRef.current;
+      const cur = st[st.length - 1] || "", prev = st[st.length - 2] || "";
+      // חזרה לעמוד ההתחברות מנתקת מהחשבון: במקום זה, מעבירים את האפליקציה לרקע
+      if (canGoBack.current && web.current && !/login/i.test(prev) && !/\/main\/dashboard/i.test(cur)) {
+        web.current.goBack();
+        st.pop();
+        return true;
+      }
+      try { if (MashovListener && MashovListener.moveToBack) { MashovListener.moveToBack(); return true; } } catch (e) {}
       return false;
     });
     return () => sub.remove();
@@ -295,7 +304,11 @@ function Main() {
         thirdPartyCookiesEnabled
         setSupportMultipleWindows={false}
         onMessage={onMessage}
-        onNavigationStateChange={(n) => { canGoBack.current = n.canGoBack; }}
+        onNavigationStateChange={(n) => {
+          canGoBack.current = n.canGoBack;
+          const st = urlsRef.current;
+          if (n.url && st[st.length - 1] !== n.url) { st.push(n.url); if (st.length > 30) st.shift(); }
+        }}
         allowsBackForwardNavigationGestures
       />
 
