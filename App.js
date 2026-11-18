@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  AppState,
   BackHandler,
   Modal,
   Platform,
@@ -16,6 +17,7 @@ import { StatusBar } from "expo-status-bar";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
+import MashovListener from "./modules/mashov-listener";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { SCRIPT, DEFAULTS, FUNNY_TEXT, ESS_TEXT } from "./mp";
 
@@ -76,7 +78,23 @@ function Main() {
     return () => sub.remove();
   }, [open]);
 
-  const cfg = { ...DEFAULTS, ...(store || {}) };
+  const cfg = { ...DEFAULTS, listen: true, hideOrig: true, ...(store || {}) };
+
+  // מאזין להתראות של אפליקציית משוב (קוד אנדרואיד מקורי)
+  const [listenOk, setListenOk] = useState(false);
+  const listenRef = useRef(false);
+  const checkListen = useCallback(() => {
+    try { const ok = !!(MashovListener && MashovListener.isEnabled()); setListenOk(ok); listenRef.current = ok; } catch (e) {}
+  }, []);
+  useEffect(() => {
+    checkListen();
+    const sub = AppState.addEventListener("change", (st) => { if (st === "active") checkListen(); });
+    return () => sub.remove();
+  }, [checkListen]);
+  useEffect(() => {
+    if (!MashovListener || store === null) return;
+    try { MashovListener.setConfig(!!cfg.listen, !!cfg.hideOrig, !!cfg.funny, String(cfg.funnyList || "")); } catch (e) {}
+  }, [store]);
 
   const storeRef = useRef(null);
   storeRef.current = store;
@@ -86,6 +104,7 @@ function Main() {
     try { m = JSON.parse(ev.nativeEvent.data); } catch (e) { return; }
     const next = { ...(storeRef.current || {}) };
     if (m.type === "mp-notify") {
+      if (listenRef.current && (storeRef.current || {}).listen !== false) return;
       Notifications.scheduleNotificationAsync({
         content: { title: m.title, body: m.body },
         trigger: Platform.OS === "android" ? { channelId: "mail" } : null,
@@ -201,7 +220,25 @@ function Main() {
               <Switch value={cfg.nav} onValueChange={(v) => update({ nav: v })} />
             </Row>
 
-            <Row label="התראה על הודעות חדשות">
+            <Row label="התראות מאפליקציית משוב">
+              <Switch value={cfg.listen} onValueChange={(v) => update({ listen: v })} />
+            </Row>
+            <Row label="הסתר את ההתראה המקורית">
+              <Switch value={cfg.hideOrig} onValueChange={(v) => update({ hideOrig: v })} />
+            </Row>
+            {MashovListener ? (
+              listenOk ? (
+                <Text style={s.sub}>✅ יש גישה להתראות. כל התראה ממשוב תגיע ממשוב פלוס.</Text>
+              ) : (
+                <TouchableOpacity style={[s.btn, { backgroundColor: "#8a5a00" }]} onPress={() => { try { MashovListener.openSettings(); } catch (e) {} }}>
+                  <Text style={s.btnT}>⚠️ צריך לאשר "גישה להתראות". לחצו כאן ובחרו משוב פלוס</Text>
+                </TouchableOpacity>
+              )
+            ) : (
+              <Text style={s.sub}>האזנה להתראות לא זמינה בגרסה הזו</Text>
+            )}
+
+            <Row label="בדיקת הודעות כשמשוב פתוח">
               <Switch value={cfg.notify} onValueChange={(v) => update({ notify: v })} />
             </Row>
 
