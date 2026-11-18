@@ -15,10 +15,18 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { SCRIPT, DEFAULTS, FUNNY_TEXT, ESS_TEXT } from "./mp";
 
 const STORE_KEY = "mp-store";
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false,
+    shouldShowAlert: true,
+  }),
+});
 const START_URL = "https://web.mashov.info/students/login";
 const SWATCHES = ["#1d8fa8", "#e53935", "#8e24aa", "#43a047", "#fb8c00", "#3f51b5", "#00897b", "#f06292"];
 
@@ -39,6 +47,19 @@ function Main() {
   const [essKey, setEssKey] = useState(0);
   const web = useRef(null);
   const canGoBack = useRef(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        if (Platform.OS === "android") {
+          await Notifications.setNotificationChannelAsync("mail", {
+            name: "הודעות חדשות", importance: Notifications.AndroidImportance.HIGH,
+          });
+        }
+        await Notifications.requestPermissionsAsync();
+      } catch (e) {}
+    })();
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(STORE_KEY)
@@ -64,6 +85,13 @@ function Main() {
     let m;
     try { m = JSON.parse(ev.nativeEvent.data); } catch (e) { return; }
     const next = { ...(storeRef.current || {}) };
+    if (m.type === "mp-notify") {
+      Notifications.scheduleNotificationAsync({
+        content: { title: m.title, body: m.body },
+        trigger: Platform.OS === "android" ? { channelId: "mail" } : null,
+      }).catch(() => {});
+      return;
+    }
     if (m.type === "set") Object.assign(next, m.patch);
     else if (m.type === "remove") m.keys.forEach((k) => delete next[k]);
     else return;
@@ -173,7 +201,11 @@ function Main() {
               <Switch value={cfg.nav} onValueChange={(v) => update({ nav: v })} />
             </Row>
 
-            <Text style={s.sub}>Essentials: כל שורה היא אייקון ושם הפריט המקורי בתפריט. אפשר גם ללחוץ ☆ ליד פריט בטאב "הכל".</Text>
+            <Row label="התראה על הודעות חדשות">
+              <Switch value={cfg.notify} onValueChange={(v) => update({ notify: v })} />
+            </Row>
+
+            <Text style={s.sub}>גישה מהירה: כל שורה היא אייקון ושם הפריט המקורי בתפריט. אפשר גם ללחוץ ☆ ליד פריט בטאב "הכל".</Text>
             <TextInput
               key={"ess" + essKey}
               style={[s.input, s.list, { minHeight: 120 }]}
@@ -184,7 +216,7 @@ function Main() {
               textAlign="right"
             />
             <TouchableOpacity style={s.btn} onPress={() => { update({ essList: ESS_TEXT }); setEssKey((k) => k + 1); }}>
-              <Text style={s.btnT}>↩︎ אפס Essentials לברירת מחדל</Text>
+              <Text style={s.btnT}>↩︎ אפס גישה מהירה לברירת מחדל</Text>
             </TouchableOpacity>
 
             <Row label="שמות מצחיקים">
