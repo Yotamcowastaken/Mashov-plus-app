@@ -15,6 +15,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { SCRIPT, DEFAULTS, FUNNY_TEXT, ESS_TEXT } from "./mp";
 
 const STORE_KEY = "mp-store";
@@ -22,6 +23,15 @@ const START_URL = "https://web.mashov.info/students/login";
 const SWATCHES = ["#1d8fa8", "#e53935", "#8e24aa", "#43a047", "#fb8c00", "#3f51b5", "#00897b", "#f06292"];
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <Main />
+    </SafeAreaProvider>
+  );
+}
+
+function Main() {
+  const insets = useSafeAreaInsets();
   const [store, setStore] = useState(null); // רק מה שהמשתמש שינה
   const [open, setOpen] = useState(false);
   const [hex, setHex] = useState("");
@@ -78,7 +88,8 @@ export default function App() {
   if (store === null) return <View style={s.root} />;
 
   const injected = `window.__MP_INITIAL = ${JSON.stringify(store)};\n${SCRIPT}\ntrue;`;
-  const top = Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 40;
+  const top = insets.top || (Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 40);
+  const bottom = insets.bottom;
 
   const Row = ({ label, children }) => (
     <View style={s.row}>
@@ -88,7 +99,8 @@ export default function App() {
   );
 
   return (
-    <View style={[s.root, { paddingTop: top }]}>
+    <View style={[s.root, { paddingTop: top, paddingBottom: bottom }]}>
+      <View style={{ flex: 1 }}>
       <StatusBar style="light" backgroundColor="#1a1a1a" />
       <WebView
         ref={web}
@@ -108,6 +120,7 @@ export default function App() {
       <TouchableOpacity style={s.gear} onPress={() => setOpen(true)} accessibilityLabel="הגדרות">
         <Text style={s.gearText}>⚙️</Text>
       </TouchableOpacity>
+      </View>
 
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={[s.modal, { paddingTop: top + 8 }]}>
@@ -115,7 +128,7 @@ export default function App() {
             <TouchableOpacity onPress={() => setOpen(false)}><Text style={s.done}>סגור</Text></TouchableOpacity>
             <Text style={s.title}>משו״ב פלוס</Text>
           </View>
-          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 + bottom }} keyboardShouldPersistTaps="handled">
             <Row label="מצב כהה">
               <Switch value={cfg.dark !== "off"} onValueChange={(v) => update({ dark: v ? "on" : "off" })} />
             </Row>
