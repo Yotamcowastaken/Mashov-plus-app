@@ -406,7 +406,18 @@ function Main() {
             <Section open={sec === "backup"} onToggle={() => setSec(sec === "backup" ? "" : "backup")} title="💾 גיבוי ושיתוף">
               <Text style={s.sub}>"ייצוא" שולח את כל ההגדרות כטקסט (וואטסאפ, מייל...). חבר מדביק אותו כאן ולוחץ "ייבוא".</Text>
               <TouchableOpacity style={s.btn} onPress={() => {
-                Share.share({ message: JSON.stringify({ mashovPlus: 1, settings: store }) }).catch(() => {});
+                const names = [];
+                const pk = Object.values(PACKS).find((p) => p.text === cfg.funnyList);
+                if (pk) names.push("חבילת " + pk.name);
+                else if (store.funnyList) names.push("שמות מצחיקים משלי");
+                const th = THEMES.find((t) => t[0] === cfg.theme && t[0] !== "none");
+                if (th) names.push("ערכת " + th[1]);
+                if (cfg.hideGrades) names.push("🙈 אל תראה לי");
+                const msg =
+                  "⚙️ ההגדרות שלי במשוב פלוס" + (names.length ? ": " + names.join(", ") : "") + "\n" +
+                  "להעתיק את כל ההודעה ולהדביק באפליקציה: ⚙️ ← 💾 גיבוי ושיתוף ← 📥 ייבוא\n\n" +
+                  JSON.stringify({ mashovPlus: 1, settings: store });
+                Share.share({ message: msg }).catch(() => {});
               }}>
                 <Text style={s.btnT}>📤 ייצוא ושיתוף</Text>
               </TouchableOpacity>
@@ -414,7 +425,7 @@ function Main() {
                 placeholder="הדביקו כאן גיבוי" placeholderTextColor="#777" autoCorrect={false} autoCapitalize="none" />
               <TouchableOpacity style={s.btn} onPress={() => {
                 let d;
-                try { d = JSON.parse(ioText); } catch (e) { setIoMsg("הטקסט לא תקין"); return; }
+                try { d = JSON.parse(ioText.slice(ioText.indexOf("{"), ioText.lastIndexOf("}") + 1)); } catch (e) { setIoMsg("לא נמצא קוד הגדרות בטקסט"); return; }
                 if (!d || !d.mashovPlus || typeof d.settings !== "object") { setIoMsg("זה לא גיבוי של משוב פלוס"); return; }
                 const known = { ...DEFAULTS, listen: true, hideOrig: true };
                 const clean = {};
