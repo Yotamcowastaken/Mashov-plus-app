@@ -26,6 +26,26 @@ class MashovListenerModule : Module() {
       context.startActivity(i)
     }
 
+    Function("canPost") { MashovNotificationService.canPost(context) }
+
+    // פותח את הגדרות ההתראות של משוב פלוס
+    Function("openAppNotificationSettings") {
+      val i = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+      i.putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+      i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      context.startActivity(i)
+    }
+
+    // התראת בדיקה דרך אותו מסלול שבו עוברות ההתראות ממשוב
+    Function("sendTest") {
+      MashovNotificationService.post(context, 4242, "משוב פלוס", "זו התראת בדיקה. אם רואים אותה, הכול עובד ✅")
+      MashovNotificationService.canPost(context)
+    }
+
+    Function("getLog") {
+      context.getSharedPreferences(MashovNotificationService.PREFS, Context.MODE_PRIVATE).getString("log", "") ?: ""
+    }
+
     // ההגדרות מהאפליקציה נשמרות כדי שהשירות יקרא אותן גם כשהאפליקציה סגורה
     Function("setConfig") { enabled: Boolean, hide: Boolean, funny: Boolean, funnyList: String ->
       context.getSharedPreferences(MashovNotificationService.PREFS, Context.MODE_PRIVATE).edit()

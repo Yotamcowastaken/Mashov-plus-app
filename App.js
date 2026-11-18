@@ -82,9 +82,14 @@ function Main() {
 
   // מאזין להתראות של אפליקציית משוב (קוד אנדרואיד מקורי)
   const [listenOk, setListenOk] = useState(false);
+  const [postOk, setPostOk] = useState(true);
+  const [log, setLog] = useState("");
   const listenRef = useRef(false);
   const checkListen = useCallback(() => {
-    try { const ok = !!(MashovListener && MashovListener.isEnabled()); setListenOk(ok); listenRef.current = ok; } catch (e) {}
+    try {
+      const ok = !!(MashovListener && MashovListener.isEnabled()); setListenOk(ok); listenRef.current = ok;
+      if (MashovListener) { setPostOk(!!MashovListener.canPost()); setLog(MashovListener.getLog() || ""); }
+    } catch (e) {}
   }, []);
   useEffect(() => {
     checkListen();
@@ -169,7 +174,7 @@ function Main() {
       </TouchableOpacity>
       </View>
 
-      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
+      <Modal onShow={checkListen} visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
         <View style={[s.modal, { paddingTop: top + 8 }]}>
           <View style={s.head}>
             <TouchableOpacity onPress={() => setOpen(false)}><Text style={s.done}>סגור</Text></TouchableOpacity>
@@ -237,6 +242,22 @@ function Main() {
             ) : (
               <Text style={s.sub}>האזנה להתראות לא זמינה בגרסה הזו</Text>
             )}
+            {MashovListener && !postOk ? (
+              <TouchableOpacity style={[s.btn, { backgroundColor: "#8a2a2a" }]} onPress={() => { try { MashovListener.openAppNotificationSettings(); } catch (e) {} }}>
+                <Text style={s.btnT}>🔕 ההתראות של משוב פלוס כבויות. לחצו כאן והפעילו אותן</Text>
+              </TouchableOpacity>
+            ) : null}
+            {MashovListener ? (
+              <TouchableOpacity style={s.btn} onPress={async () => {
+                try { await Notifications.requestPermissionsAsync(); MashovListener.sendTest(); } catch (e) {}
+                setTimeout(checkListen, 500);
+              }}>
+                <Text style={s.btnT}>🔔 שלח התראת בדיקה</Text>
+              </TouchableOpacity>
+            ) : null}
+            {MashovListener && log ? (
+              <Text style={[s.sub, { fontSize: 12 }]}>יומן התראות:{"\n"}{log}</Text>
+            ) : null}
 
             <Row label="בדיקת הודעות כשמשוב פתוח">
               <Switch value={cfg.notify} onValueChange={(v) => update({ notify: v })} />

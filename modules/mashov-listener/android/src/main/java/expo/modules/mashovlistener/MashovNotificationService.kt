@@ -15,6 +15,55 @@ class MashovNotificationService : NotificationListenerService() {
   companion object {
     const val PREFS = "mashov_listener"
     const val CHANNEL = "mashov_forward"
+
+    fun ensureChannel(ctx: Context) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.createNotificationChannel(
+          NotificationChannel(CHANNEL, "הודעות ממשוב", NotificationManager.IMPORTANCE_HIGH)
+        )
+      }
+    }
+
+    // האם התראות של משוב פלוס באמת יכולות להופיע
+    fun canPost(ctx: Context): Boolean {
+      val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      if (!nm.areNotificationsEnabled()) return false
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        ensureChannel(ctx)
+        val ch = nm.getNotificationChannel(CHANNEL)
+        if (ch != null && ch.importance == NotificationManager.IMPORTANCE_NONE) return false
+      }
+      return true
+    }
+
+    fun post(ctx: Context, id: Int, title: String, text: String) {
+      ensureChannel(ctx)
+      val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+      var icon = ctx.resources.getIdentifier("notification_icon", "drawable", ctx.packageName)
+      if (icon == 0) icon = ctx.applicationInfo.icon
+      val launch = ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)
+      val pi = launch?.let {
+        PendingIntent.getActivity(ctx, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+      }
+      val b = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+        Notification.Builder(ctx, CHANNEL) else Notification.Builder(ctx)
+      b.setSmallIcon(icon)
+        .setContentTitle(title)
+        .setContentText(text)
+        .setStyle(Notification.BigTextStyle().bigText(text))
+        .setAutoCancel(true)
+        .setCategory(Notification.CATEGORY_MESSAGE)
+      if (pi != null) b.setContentIntent(pi)
+      nm.notify(id, b.build())
+    }
+
+    fun log(ctx: Context, msg: String) {
+      val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+      val time = java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale.US).format(java.util.Date())
+      val lines = (p.getString("log", "") ?: "").split("\n").filter { it.isNotBlank() }.take(9)
+      p.edit().putString("log", (listOf("$time  $msg") + lines).joinToString("\n")).apply()
+    }
   }
 
   private val labelCache = HashMap<String, Boolean>()
@@ -49,10 +98,15 @@ class MashovNotificationService : NotificationListenerService() {
     return out
   }
 
+  override fun onListenerConnected() {
+    log(this, "המאזין להתראות פעיל")
+  }
+
   override fun onNotificationPosted(sbn: StatusBarNotification) {
     try {
       handle(sbn)
     } catch (e: Exception) {
+      log(this, "שגיאה: " + e.javaClass.simpleName)
     }
   }
 
@@ -63,11 +117,8 @@ class MashovNotificationService : NotificationListenerService() {
     val hide = prefs.getBoolean("hide", true)
     val n = sbn.notification
 
-    // התראת סיכום של קבוצה: לא מעבירים, רק מסתירים
-    if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
-      if (hide) cancelNotification(sbn.key)
-      return
-    }
+    // התראת סיכום של קבוצה: לא נוגעים (ביטול שלה עלול למחוק גם את ההתראות שבתוכה)
+    if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
     // התראה קבועה (למשל סנכרון ברקע): לא נוגעים
     if (n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
 
@@ -77,34 +128,15 @@ class MashovNotificationService : NotificationListenerService() {
       ?: ex.getCharSequence(Notification.EXTRA_TEXT))?.toString() ?: ""
     if (title.isBlank() && text.isBlank()) return
 
-    val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      nm.createNotificationChannel(
-        NotificationChannel(CHANNEL, "הודעות ממשוב", NotificationManager.IMPORTANCE_HIGH)
-      )
-    }
-
-    var icon = resources.getIdentifier("notification_icon", "drawable", packageName)
-    if (icon == 0) icon = applicationInfo.icon
-
-    val launch = packageManager.getLaunchIntentForPackage(packageName)
-    val pi = launch?.let {
-      PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-    }
-
     val ft = funnify(title, prefs)
     val fx = funnify(text, prefs)
-    val b = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-      Notification.Builder(this, CHANNEL) else Notification.Builder(this)
-    b.setSmallIcon(icon)
-      .setContentTitle(ft)
-      .setContentText(fx)
-      .setStyle(Notification.BigTextStyle().bigText(fx))
-      .setAutoCancel(true)
-      .setCategory(Notification.CATEGORY_MESSAGE)
-    if (pi != null) b.setContentIntent(pi)
-
-    nm.notify(sbn.key.hashCode(), b.build())
+    if (!canPost(this)) {
+      // ההתראות של משוב פלוס כבויות: משאירים את המקורית כדי שלא יאבד כלום
+      log(this, "ממשוב: \"$title\" - לא הועבר, ההתראות של משוב פלוס כבויות")
+      return
+    }
+    post(this, sbn.key.hashCode(), ft, fx)
+    log(this, "ממשוב (${sbn.packageName}): \"$title\" - הועבר" + if (hide) " והמקור הוסתר" else "")
     if (hide) cancelNotification(sbn.key)
   }
 }
