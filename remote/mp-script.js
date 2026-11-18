@@ -361,7 +361,12 @@ const MP_DEFAULTS = {
           return;
         }
         const v = parseFloat(t);
-        const inGradeCtx = !!(pathOk || el.closest("[class*=grade],[class*=mark],[class*=score],#mp-avg"));
+        // לא ציון: סרגל עליון, תפריט, כפתורים, תגיות של התראות
+        const notGrade = el.closest(
+          "mat-toolbar, header, [role=banner], nav, [role=navigation], mat-sidenav, mat-drawer, " +
+          "button, [role=button], mat-icon, [class*=badge], [class*=toolbar], [class*=header], [class*=notif], #mp-panel, #mp-fab"
+        );
+        const inGradeCtx = !notGrade && !!(pathOk || el.closest("[class*=grade],[class*=mark],[class*=score],#mp-avg"));
         const isGrade = inGradeCtx && v >= 0 && v <= 100;
         el.classList.toggle("mp-gr", isGrade);
         el.classList.toggle("mp-glow", isGrade && settings.glow && v >= settings.glowMin);
