@@ -48,15 +48,18 @@ jobs:
         working-directory: build/android
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Name APK with build number
+        run: cp build/android/app/build/outputs/apk/release/app-release.apk mashov-plus-build-${{ github.run_number }}.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: mashov-plus-apk
-          path: build/android/app/build/outputs/apk/release/app-release.apk
+          path: mashov-plus-build-${{ github.run_number }}.apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: משוב פלוס (build ${{ github.run_number }})
-          files: build/android/app/build/outputs/apk/release/app-release.apk
+          files: mashov-plus-build-${{ github.run_number }}.apk
