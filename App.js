@@ -5,6 +5,7 @@ import {
   BackHandler,
   Modal,
   Platform,
+  Share,
   ScrollView,
   StatusBar as RNStatusBar,
   StyleSheet,
@@ -20,7 +21,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import MashovListener from "./modules/mashov-listener";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
-import { SCRIPT, DEFAULTS, FUNNY_TEXT, ESS_TEXT } from "./mp";
+import { SCRIPT, DEFAULTS, FUNNY_TEXT, ESS_TEXT, PACKS } from "./mp";
 import BUILD_INFO from "./build-info.json";
 
 const STORE_KEY = "mp-store";
@@ -38,7 +39,35 @@ Notifications.setNotificationHandler({
   }),
 });
 const START_URL = "https://web.mashov.info/students/login";
+const THEMES = [
+  ["none", "ללא", null],
+  ["space", "🌌 חלל", "#7c4dff"],
+  ["neon", "💜 ניאון", "#ff2bd6"],
+  ["winter", "❄️ חורף", "#4fc3f7"],
+];
 const SWATCHES = ["#1d8fa8", "#e53935", "#8e24aa", "#43a047", "#fb8c00", "#3f51b5", "#00897b", "#f06292"];
+
+// מחוץ לקומפוננטה, כדי ששדות טקסט לא יאבדו פוקוס בכל הקלדה
+function Section({ open, onToggle, title, children }) {
+  return (
+    <View style={s.section}>
+      <TouchableOpacity style={s.secHead} onPress={onToggle}>
+        <Text style={s.secTitle}>{title}</Text>
+        <Text style={s.secArrow}>{open ? "▾" : "◂"}</Text>
+      </TouchableOpacity>
+      {open ? <View style={{ paddingBottom: 10 }}>{children}</View> : null}
+    </View>
+  );
+}
+
+function Row({ label, children }) {
+  return (
+    <View style={s.row}>
+      <Text style={s.label}>{label}</Text>
+      {children}
+    </View>
+  );
+}
 
 export default function App() {
   return (
@@ -55,6 +84,9 @@ function Main() {
   const [hex, setHex] = useState("");
   const [listKey, setListKey] = useState(0);
   const [essKey, setEssKey] = useState(0);
+  const [sec, setSec] = useState("look");
+  const [ioText, setIoText] = useState("");
+  const [ioMsg, setIoMsg] = useState("");
   const web = useRef(null);
   const canGoBack = useRef(false);
 
@@ -203,12 +235,6 @@ function Main() {
   const top = insets.top || (Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 40);
   const bottom = insets.bottom;
 
-  const Row = ({ label, children }) => (
-    <View style={s.row}>
-      <Text style={s.label}>{label}</Text>
-      {children}
-    </View>
-  );
 
   return (
     <View style={[s.root, { paddingTop: top, paddingBottom: bottom }]}>
@@ -260,121 +286,147 @@ function Main() {
                 <Text style={[s.sub, { marginTop: 4 }]}>✅ זו הגרסה האחרונה</Text>
               )}
             </View>
-            <Row label="מצב כהה">
-              <Switch value={cfg.dark !== "off"} onValueChange={(v) => update({ dark: v ? "on" : "off" })} />
-            </Row>
 
-            <Row label="אקסנט על האתר">
-              <Switch value={cfg.useAccent} onValueChange={(v) => update({ useAccent: v })} />
-            </Row>
-            <Text style={s.sub}>צבע אקסנט</Text>
-            <View style={s.swatches}>
-              {SWATCHES.map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  onPress={() => update({ accent: c })}
-                  style={[s.swatch, { backgroundColor: c }, cfg.accent === c && s.swatchOn]}
-                />
-              ))}
-            </View>
-            <TextInput
-              style={s.input}
-              value={hex || cfg.accent}
-              onChangeText={(t) => {
-                setHex(t);
-                if (/^#[0-9a-fA-F]{6}$/.test(t)) update({ accent: t });
-              }}
-              onBlur={() => setHex("")}
-              autoCapitalize="none"
-              autoCorrect={false}
-              placeholder="#1d8fa8"
-              placeholderTextColor="#777"
-            />
+            <Section open={sec === "look"} onToggle={() => setSec(sec === "look" ? "" : "look")} title="🎨 מראה">
+              <Row label="מצב כהה">
+                <Switch value={cfg.dark !== "off"} onValueChange={(v) => update({ dark: v ? "on" : "off" })} />
+              </Row>
+              <Text style={s.sub}>ערכת נושא</Text>
+              <View style={s.chips}>
+                {THEMES.map(([id, name, color]) => (
+                  <TouchableOpacity key={id} style={[s.chip, cfg.theme === id && s.chipOn]}
+                    onPress={() => update(color ? { theme: id, accent: color } : { theme: id })}>
+                    <Text style={s.btnT}>{name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Row label="אקסנט על האתר">
+                <Switch value={cfg.useAccent} onValueChange={(v) => update({ useAccent: v })} />
+              </Row>
+              <Text style={s.sub}>צבע אקסנט</Text>
+              <View style={s.swatches}>
+                {SWATCHES.map((c) => (
+                  <TouchableOpacity key={c} onPress={() => update({ accent: c })}
+                    style={[s.swatch, { backgroundColor: c }, cfg.accent === c && s.swatchOn]} />
+                ))}
+              </View>
+              <TextInput style={s.input} value={hex || cfg.accent}
+                onChangeText={(t) => { setHex(t); if (/^#[0-9a-fA-F]{6}$/.test(t)) update({ accent: t }); }}
+                onBlur={() => setHex("")} autoCapitalize="none" autoCorrect={false}
+                placeholder="#1d8fa8" placeholderTextColor="#777" />
+            </Section>
 
-            <Row label="זוהר לציונים">
-              <Switch value={cfg.glow} onValueChange={(v) => update({ glow: v })} />
-            </Row>
-            <View style={s.stepper}>
-              <TouchableOpacity style={s.step} onPress={() => update({ glowMin: Math.min(100, cfg.glowMin + 1) })}><Text style={s.stepT}>+</Text></TouchableOpacity>
-              <Text style={s.stepVal}>מעל {cfg.glowMin}</Text>
-              <TouchableOpacity style={s.step} onPress={() => update({ glowMin: Math.max(0, cfg.glowMin - 1) })}><Text style={s.stepT}>−</Text></TouchableOpacity>
-            </View>
+            <Section open={sec === "grades"} onToggle={() => setSec(sec === "grades" ? "" : "grades")} title="📊 ציונים">
+              <Row label="ממוצע בעמוד הציונים">
+                <Switch value={cfg.avg} onValueChange={(v) => update({ avg: v })} />
+              </Row>
+              <Row label="🙈 אל תראה לי (טשטוש)">
+                <Switch value={cfg.hideGrades} onValueChange={(v) => update({ hideGrades: v })} />
+              </Row>
+              <Text style={s.sub}>הציונים מטושטשים עד שנוגעים בהם</Text>
+              <Row label="זוהר לציונים">
+                <Switch value={cfg.glow} onValueChange={(v) => update({ glow: v })} />
+              </Row>
+              <View style={s.stepper}>
+                <TouchableOpacity style={s.step} onPress={() => update({ glowMin: Math.min(100, cfg.glowMin + 1) })}><Text style={s.stepT}>+</Text></TouchableOpacity>
+                <Text style={s.stepVal}>מעל {cfg.glowMin}</Text>
+                <TouchableOpacity style={s.step} onPress={() => update({ glowMin: Math.max(0, cfg.glowMin - 1) })}><Text style={s.stepT}>−</Text></TouchableOpacity>
+              </View>
+            </Section>
 
-            <Row label="ניווט מהיר (☰)">
-              <Switch value={cfg.nav} onValueChange={(v) => update({ nav: v })} />
-            </Row>
+            <Section open={sec === "fun"} onToggle={() => setSec(sec === "fun" ? "" : "fun")} title="😂 שמות מצחיקים">
+              <Row label="שמות מצחיקים">
+                <Switch value={cfg.funny} onValueChange={(v) => update({ funny: v })} />
+              </Row>
+              <Text style={s.sub}>חבילות (מחליפות את הרשימה)</Text>
+              <View style={s.chips}>
+                {Object.entries(PACKS).map(([id, p]) => (
+                  <TouchableOpacity key={id} style={[s.chip, cfg.funnyList === p.text && s.chipOn]}
+                    onPress={() => { update({ funnyList: p.text }); setListKey((k) => k + 1); }}>
+                    <Text style={s.btnT}>{p.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={s.sub}>כל שורה: הטקסט באתר =&gt; הטקסט המצחיק</Text>
+              <TextInput key={listKey} style={[s.input, s.list]} multiline defaultValue={cfg.funnyList}
+                onEndEditing={(e) => update({ funnyList: e.nativeEvent.text })} autoCorrect={false} textAlign="right" />
+            </Section>
 
-            <Row label="התראות מאפליקציית משוב">
-              <Switch value={cfg.listen} onValueChange={(v) => update({ listen: v })} />
-            </Row>
-            <Row label="הסתר את ההתראה המקורית">
-              <Switch value={cfg.hideOrig} onValueChange={(v) => update({ hideOrig: v })} />
-            </Row>
-            {MashovListener ? (
-              listenOk ? (
-                <Text style={s.sub}>✅ יש גישה להתראות. כל התראה ממשוב תגיע ממשוב פלוס.</Text>
+            <Section open={sec === "nav"} onToggle={() => setSec(sec === "nav" ? "" : "nav")} title="⭐ ניווט וגישה מהירה">
+              <Row label="ניווט מהיר (☰)">
+                <Switch value={cfg.nav} onValueChange={(v) => update({ nav: v })} />
+              </Row>
+              <Text style={s.sub}>גישה מהירה: כל שורה היא אייקון ושם הפריט המקורי בתפריט. אפשר גם ללחוץ ☆ ליד פריט בטאב "הכל".</Text>
+              <TextInput key={"ess" + essKey} style={[s.input, s.list, { minHeight: 120 }]} multiline defaultValue={cfg.essList}
+                onEndEditing={(e) => update({ essList: e.nativeEvent.text })} autoCorrect={false} textAlign="right" />
+              <TouchableOpacity style={s.btn} onPress={() => { update({ essList: ESS_TEXT }); setEssKey((k) => k + 1); }}>
+                <Text style={s.btnT}>↩︎ אפס גישה מהירה לברירת מחדל</Text>
+              </TouchableOpacity>
+            </Section>
+
+            <Section open={sec === "notif"} onToggle={() => setSec(sec === "notif" ? "" : "notif")} title="🔔 התראות">
+              <Row label="התראות מאפליקציית משוב">
+                <Switch value={cfg.listen} onValueChange={(v) => update({ listen: v })} />
+              </Row>
+              <Row label="הסתר את ההתראה המקורית">
+                <Switch value={cfg.hideOrig} onValueChange={(v) => update({ hideOrig: v })} />
+              </Row>
+              {MashovListener ? (
+                listenOk ? (
+                  <Text style={s.sub}>✅ יש גישה להתראות. כל התראה ממשוב תגיע ממשוב פלוס.</Text>
+                ) : (
+                  <TouchableOpacity style={[s.btn, { backgroundColor: "#8a5a00" }]} onPress={() => { try { MashovListener.openSettings(); } catch (e) {} }}>
+                    <Text style={s.btnT}>⚠️ צריך לאשר "גישה להתראות". לחצו כאן ובחרו משוב פלוס</Text>
+                  </TouchableOpacity>
+                )
               ) : (
-                <TouchableOpacity style={[s.btn, { backgroundColor: "#8a5a00" }]} onPress={() => { try { MashovListener.openSettings(); } catch (e) {} }}>
-                  <Text style={s.btnT}>⚠️ צריך לאשר "גישה להתראות". לחצו כאן ובחרו משוב פלוס</Text>
+                <Text style={s.sub}>האזנה להתראות לא זמינה בגרסה הזו</Text>
+              )}
+              {MashovListener && !postOk ? (
+                <TouchableOpacity style={[s.btn, { backgroundColor: "#8a2a2a" }]} onPress={() => { try { MashovListener.openAppNotificationSettings(); } catch (e) {} }}>
+                  <Text style={s.btnT}>🔕 ההתראות של משוב פלוס כבויות. לחצו כאן והפעילו אותן</Text>
                 </TouchableOpacity>
-              )
-            ) : (
-              <Text style={s.sub}>האזנה להתראות לא זמינה בגרסה הזו</Text>
-            )}
-            {MashovListener && !postOk ? (
-              <TouchableOpacity style={[s.btn, { backgroundColor: "#8a2a2a" }]} onPress={() => { try { MashovListener.openAppNotificationSettings(); } catch (e) {} }}>
-                <Text style={s.btnT}>🔕 ההתראות של משוב פלוס כבויות. לחצו כאן והפעילו אותן</Text>
-              </TouchableOpacity>
-            ) : null}
-            {MashovListener ? (
-              <TouchableOpacity style={s.btn} onPress={async () => {
-                try { await Notifications.requestPermissionsAsync(); MashovListener.sendTest(); } catch (e) {}
-                setTimeout(checkListen, 500);
+              ) : null}
+              {MashovListener ? (
+                <TouchableOpacity style={s.btn} onPress={async () => {
+                  try { await Notifications.requestPermissionsAsync(); MashovListener.sendTest(); } catch (e) {}
+                  setTimeout(checkListen, 500);
+                }}>
+                  <Text style={s.btnT}>🔔 שלח התראת בדיקה</Text>
+                </TouchableOpacity>
+              ) : null}
+              <Row label="בדיקת הודעות כשמשוב פתוח">
+                <Switch value={cfg.notify} onValueChange={(v) => update({ notify: v })} />
+              </Row>
+              {MashovListener && log ? (
+                <Text style={[s.sub, { fontSize: 12 }]}>יומן התראות:{"\n"}{log}</Text>
+              ) : null}
+            </Section>
+
+            <Section open={sec === "backup"} onToggle={() => setSec(sec === "backup" ? "" : "backup")} title="💾 גיבוי ושיתוף">
+              <Text style={s.sub}>"ייצוא" שולח את כל ההגדרות כטקסט (וואטסאפ, מייל...). חבר מדביק אותו כאן ולוחץ "ייבוא".</Text>
+              <TouchableOpacity style={s.btn} onPress={() => {
+                Share.share({ message: JSON.stringify({ mashovPlus: 1, settings: store }) }).catch(() => {});
               }}>
-                <Text style={s.btnT}>🔔 שלח התראת בדיקה</Text>
+                <Text style={s.btnT}>📤 ייצוא ושיתוף</Text>
               </TouchableOpacity>
-            ) : null}
-            {MashovListener && log ? (
-              <Text style={[s.sub, { fontSize: 12 }]}>יומן התראות:{"\n"}{log}</Text>
-            ) : null}
-
-            <Row label="בדיקת הודעות כשמשוב פתוח">
-              <Switch value={cfg.notify} onValueChange={(v) => update({ notify: v })} />
-            </Row>
-
-            <Text style={s.sub}>גישה מהירה: כל שורה היא אייקון ושם הפריט המקורי בתפריט. אפשר גם ללחוץ ☆ ליד פריט בטאב "הכל".</Text>
-            <TextInput
-              key={"ess" + essKey}
-              style={[s.input, s.list, { minHeight: 120 }]}
-              multiline
-              defaultValue={cfg.essList}
-              onEndEditing={(e) => update({ essList: e.nativeEvent.text })}
-              autoCorrect={false}
-              textAlign="right"
-            />
-            <TouchableOpacity style={s.btn} onPress={() => { update({ essList: ESS_TEXT }); setEssKey((k) => k + 1); }}>
-              <Text style={s.btnT}>↩︎ אפס גישה מהירה לברירת מחדל</Text>
-            </TouchableOpacity>
-
-            <Row label="שמות מצחיקים">
-              <Switch value={cfg.funny} onValueChange={(v) => update({ funny: v })} />
-            </Row>
-            <Text style={s.sub}>כל שורה: הטקסט באתר =&gt; הטקסט המצחיק</Text>
-            <TextInput
-              key={listKey}
-              style={[s.input, s.list]}
-              multiline
-              defaultValue={cfg.funnyList}
-              onEndEditing={(e) => update({ funnyList: e.nativeEvent.text })}
-              autoCorrect={false}
-              textAlign="right"
-            />
-            <TouchableOpacity
-              style={s.btn}
-              onPress={() => { update({ funnyList: FUNNY_TEXT }); setListKey((k) => k + 1); }}
-            >
-              <Text style={s.btnT}>↩︎ אפס שמות לברירת מחדל</Text>
-            </TouchableOpacity>
+              <TextInput style={[s.input, { minHeight: 70, textAlign: "left" }]} multiline value={ioText} onChangeText={setIoText}
+                placeholder="הדביקו כאן גיבוי" placeholderTextColor="#777" autoCorrect={false} autoCapitalize="none" />
+              <TouchableOpacity style={s.btn} onPress={() => {
+                let d;
+                try { d = JSON.parse(ioText); } catch (e) { setIoMsg("הטקסט לא תקין"); return; }
+                if (!d || !d.mashovPlus || typeof d.settings !== "object") { setIoMsg("זה לא גיבוי של משוב פלוס"); return; }
+                const known = { ...DEFAULTS, listen: true, hideOrig: true };
+                const clean = {};
+                for (const k of Object.keys(known)) {
+                  if (k in d.settings && typeof d.settings[k] === typeof known[k]) clean[k] = d.settings[k];
+                }
+                update(clean); setListKey((k) => k + 1); setEssKey((k) => k + 1); setIoText(""); setIoMsg("✓ ההגדרות יובאו");
+              }}>
+                <Text style={s.btnT}>📥 ייבוא</Text>
+              </TouchableOpacity>
+              {ioMsg ? <Text style={s.sub}>{ioMsg}</Text> : null}
+            </Section>
           </ScrollView>
         </View>
       </Modal>
@@ -408,6 +460,13 @@ const s = StyleSheet.create({
   stepVal: { color: "#eee", fontSize: 16, minWidth: 90, textAlign: "center" },
   btn: { backgroundColor: "#333", borderRadius: 10, padding: 12, marginTop: 12, alignItems: "center" },
   btnT: { color: "#eee", fontSize: 15 },
+  section: { backgroundColor: "#202020", borderRadius: 14, marginTop: 12, paddingHorizontal: 10 },
+  secHead: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", paddingVertical: 14 },
+  secTitle: { color: "#fff", fontSize: 17, fontWeight: "700" },
+  secArrow: { color: "#aaa", fontSize: 16 },
+  chips: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 8 },
+  chip: { backgroundColor: "#333", borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 2, borderColor: "transparent" },
+  chipOn: { borderColor: "#6cb8ff" },
   updBar: { flexDirection: "row-reverse", alignItems: "center", backgroundColor: "#1d6fa8", paddingHorizontal: 12, paddingVertical: 8 },
   updText: { color: "#fff", fontSize: 14, textAlign: "right" },
   updX: { color: "#fff", fontSize: 18, paddingHorizontal: 8 },

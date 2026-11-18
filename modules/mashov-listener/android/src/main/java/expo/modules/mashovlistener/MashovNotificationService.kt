@@ -88,13 +88,12 @@ class MashovNotificationService : NotificationListenerService() {
   private fun funnify(s: String, prefs: android.content.SharedPreferences): String {
     if (!prefs.getBoolean("funny", true)) return s
     var out = s
-    for (line in (prefs.getString("funnyList", "") ?: "").split("\n")) {
-      val parts = line.split("=>")
-      if (parts.size != 2) continue
-      val from = parts[0].trim()
-      val to = parts[1].trim()
-      if (from.isNotEmpty() && to.isNotEmpty()) out = out.replace(from, to)
-    }
+    val rules = (prefs.getString("funnyList", "") ?: "").split("\n")
+      .map { it.split("=>") }
+      .filter { it.size == 2 && it[0].isNotBlank() && it[1].isNotBlank() }
+      .map { Pair(it[0].trim(), it[1].trim()) }
+      .sortedByDescending { it.first.length }
+    for ((from, to) in rules) out = out.replace(from, to)
     return out
   }
 

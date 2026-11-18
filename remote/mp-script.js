@@ -66,6 +66,12 @@ const MP_FUNNY_DEFAULT = [
 ];
 const MP_FUNNY_TEXT = MP_FUNNY_DEFAULT.map((p) => p.join(" => ")).join("\n");
 const MP_ESS_TEXT = ["📊 ציונים שוטפים", "⚠️ התנהגות בשיעור", "📝 שיעורי בית", "✉️ דואר ומסרונים"].join("\n");
+const MP_PACKS = {
+  default: { name: "😂 ברירת מחדל", text: MP_FUNNY_TEXT },
+  gamer: { name: "🎮 גיימר", text: "לוח מידע => הלובי\nציונים שוטפים => לוח התוצאות\nציונים תקופתיים => הבוס של סוף העונה\nהתנהגות בשיעור => דוח הבאנים\nאירועי התנהגות יומיים => קילפיד יומי\nמונה אירועים => מונה הדת'ים\nשיעורי בית => קווסטים צדדיים\nשיעורי בית אחרונים => הקווסטים האחרונים\nמערכת שעות => לו\"ז הרייד\nהמערכת להיום => הרייד של היום\nדואר ומסרונים => צ'אט הגילדה\nדואר שלא נקרא => הודעות מהגילדה\nלוח מודעות => פאץ' נוטס\nכיתה מקוונת => מולטיפלייר\nחומרי לימוד => מדריכי משחק\nתעודות => הישגים פתוחים\nפרופיל אישי => הדמות שלי\nלוח מבחנים ואירועים => לוח הבוסים\nכניסה ל-Moodle => שרת משני\nבקשות הצדקה => בקשת ריספון" },
+  pirates: { name: "🏴‍☠️ פיראטים", text: "לוח מידע => סיפון האונייה\nציונים שוטפים => שלל המטמון\nציונים תקופתיים => מפת האוצר\nהתנהגות בשיעור => מי שוב התמרד?\nאירועי התנהגות יומיים => יומן הקפטן\nמונה אירועים => מונה ההליכות על הקרש\nשיעורי בית => עבודות על הסיפון\nשיעורי בית אחרונים => קרצוף הסיפון האחרון\nמערכת שעות => לוח המשמרות\nהמערכת להיום => המשמרת של היום\nדואר ומסרונים => בקבוקים בים\nדואר שלא נקרא => בקבוקים שלא נפתחו\nלוח מודעות => מודעות מבוקשים\nכיתה מקוונת => הגשר\nחומרי לימוד => מפות ישנות\nתעודות => מכתבי החסינות\nפרופיל אישי => הקפטן\nלוח מבחנים ואירועים => לוח הסערות\nכניסה ל-Moodle => האי המסתורי\nבקשות הצדקה => תירוצים לקפטן" },
+  army: { name: "🪖 צבא", text: "לוח מידע => חמ\"ל\nציונים שוטפים => דוח מצב\nציונים תקופתיים => מבחן כשירות\nהתנהגות בשיעור => שפיטה\nאירועי התנהגות יומיים => דוח משמעת יומי\nמונה אירועים => מונה ריתוקים\nשיעורי בית => תורנויות\nשיעורי בית אחרונים => התורנויות האחרונות\nמערכת שעות => לו\"ז פלוגתי\nהמערכת להיום => פקודת יום\nדואר ומסרונים => קשר\nדואר שלא נקרא => הודעות קשר שלא נקראו\nלוח מודעות => פקודות מטכ\"ל\nכיתה מקוונת => תדריך\nחומרי לימוד => תיק שטח\nתעודות => תעודת שחרור\nפרופיל אישי => הדיסקית שלי\nלוח מבחנים ואירועים => לוח מבצעים\nכניסה ל-Moodle => בסיס משני\nבקשות הצדקה => בקשת יציאה" },
+};
 const MP_DEFAULTS = {
   dark: "on",          // "auto" | "on" | "off"
   nav: true,
@@ -75,12 +81,15 @@ const MP_DEFAULTS = {
   glowMin: 85,
   funny: true,
   funnyList: MP_FUNNY_TEXT,
-  notify: true,          // התראה על הודעות חדשות
+  notify: true,
+  avg: true,             // ממוצע בעמוד הציונים
+  hideGrades: false,     // "אל תראה לי"
+  theme: "none",         // none | space | neon | winter          // התראה על הודעות חדשות
   essList: MP_ESS_TEXT,  // כל שורה: אייקון ואז שם הפריט המקורי בתפריט
 };
 
     var st = document.createElement("style");
-    st.textContent = "/* =====================================================================\n   מצב כהה\n   הפילטר (invert + hue-rotate) לא מסוגל להציג צבעים רוויים, לכן אלמנטים\n   שצבועים באקסנט (.mp-tint) נשארים מחוץ לפילטר, והפילטר מוחל רק על\n   האזורים שסביבם. אם אין אלמנט כזה, הפילטר מוחל על כל ה-body.\n   ===================================================================== */\nhtml.mp-dark { background: #1a1a1a; color-scheme: dark; }\n\nhtml.mp-dark body:not(:has(.mp-tint)) {\n  background: #fff;\n  filter: invert(0.9) hue-rotate(180deg);\n}\nhtml.mp-dark body:has(.mp-tint) {\n  background: #1a1a1a !important;\n  color: #e5e5e5;\n}\n/* אבות של אלמנט האקסנט: רקע כהה ישיר, בלי פילטר */\nhtml.mp-dark :has(.mp-tint):not(.mp-tint):not(html):not(body) {\n  background-color: #1a1a1a !important;\n  color: #e5e5e5;\n}\n/* האזורים שסביב: מסוננים בנפרד */\nhtml.mp-dark :has(.mp-tint) > :not(:has(.mp-tint)):not(.mp-tint):not(#mp-fab):not(#mp-panel):not(body) {\n  filter: invert(0.9) hue-rotate(180deg);\n}\n\n/* תמונות ווידאו חוזרים לצבעים רגילים (רק בתוך אזורים מסוננים) */\nhtml.mp-dark body:not(:has(.mp-tint)) :is(img, video, canvas, picture, iframe, [style*=\"background-image\"]),\nhtml.mp-dark :has(.mp-tint) > :not(:has(.mp-tint)):not(.mp-tint):not(#mp-fab):not(#mp-panel):not(body) :is(img, video, canvas, picture, iframe, [style*=\"background-image\"]) {\n  filter: invert(1) hue-rotate(180deg);\n}\n\n/* =====================================================================\n   אקסנט\n   --mp-accent        = הצבע המדויק (לאלמנטים שמחוץ לפילטר)\n   --mp-accent-f      = הצבע אחרי תיקון לפילטר (לקישורים וטאבים)\n   ===================================================================== */\nhtml.mp-accent .mp-tint {\n  background-color: var(--mp-accent) !important;\n  color: var(--mp-on-accent) !important;\n}\nhtml.mp-accent .mp-tint * {\n  color: var(--mp-on-accent) !important;\n}\n\nhtml.mp-accent a:not(.mp-item),\nhtml.mp-accent .mat-tab-label-active,\nhtml.mp-accent .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {\n  color: var(--mp-accent-f) !important;\n}\nhtml.mp-accent .mat-ink-bar,\nhtml.mp-accent .mdc-tab-indicator__content--underline {\n  background-color: var(--mp-accent-f) !important;\n  border-color: var(--mp-accent-f) !important;\n}\n\n/* =====================================================================\n   ציונים מעל הסף: זוהר\n   ===================================================================== */\n.mp-glow {\n  color: var(--mp-glow, #ffb300) !important;\n  font-weight: 700 !important;\n  text-shadow: 0 0 6px var(--mp-glow, #ffb300), 0 0 14px var(--mp-glow, #ffb300);\n  animation: mp-pulse 2.2s ease-in-out infinite;\n}\n@keyframes mp-pulse {\n  50% {\n    text-shadow: 0 0 12px var(--mp-glow, #ffb300), 0 0 28px var(--mp-glow, #ffb300);\n  }\n}\n\n/* =====================================================================\n   ניווט מהיר (נמצא מחוץ ל-body ולכן אף פעם לא מסונן)\n   ===================================================================== */\n#mp-fab {\n  position: fixed; left: 16px; bottom: 16px; z-index: 2147483000;\n  width: 48px; height: 48px; border-radius: 50%; border: 0; cursor: pointer;\n  background: var(--mp-accent, #1565c0); color: var(--mp-on-accent, #fff); font-size: 22px;\n  box-shadow: 0 2px 8px rgba(0,0,0,.35);\n}\n#mp-panel {\n  position: fixed; left: 16px; bottom: 72px; z-index: 2147483000;\n  width: 300px; max-height: 70vh; overflow: auto; direction: rtl;\n  background: #fff; color: #222; border-radius: 12px; padding: 10px;\n  border: 1px solid #999;\n  box-shadow: 0 4px 18px rgba(0,0,0,.35); font: 14px/1.4 Arial, sans-serif;\n  display: none;\n}\n#mp-panel.open { display: block; }\n#mp-tabs { display: flex; gap: 6px; margin-bottom: 8px; }\n#mp-tabs button {\n  flex: 1; padding: 7px; border: 1px solid #bbb; border-radius: 8px; cursor: pointer;\n  background: #f3f6fb; color: #222; font: inherit; font-weight: bold;\n}\n#mp-tabs button.on {\n  background: var(--mp-accent, #1565c0); color: var(--mp-on-accent, #fff);\n  border-color: transparent;\n}\n#mp-search {\n  width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px;\n  border: 1px solid #bbb; border-radius: 8px; font-size: 14px;\n  background: #fff; color: #222;\n}\n#mp-panel details { margin-bottom: 4px; border-radius: 8px; background: #f3f6fb; }\n#mp-panel summary { cursor: pointer; padding: 8px 10px; font-weight: bold; }\n#mp-panel .mp-item {\n  display: block; width: 100%; text-align: right; box-sizing: border-box;\n  padding: 7px 18px; border: 0; background: transparent; cursor: pointer;\n  font: inherit; color: #0d47a1;\n}\n#mp-panel .mp-item:hover { background: #dce8f8; }\n#mp-panel .mp-big {\n  padding: 12px 14px; margin-bottom: 6px; border-radius: 10px; font-size: 16px;\n  font-weight: bold; background: #f3f6fb; border: 1px solid #d5deec;\n}\n#mp-panel .mp-empty { padding: 8px; color: #666; }\n\n/* החלונית במצב כהה */\nhtml.mp-dark #mp-panel { background: #262626; color: #eee; border-color: #555; }\nhtml.mp-dark #mp-tabs button { background: #333; color: #eee; border-color: #555; }\nhtml.mp-dark #mp-tabs button.on { background: var(--mp-accent); color: var(--mp-on-accent); }\nhtml.mp-dark #mp-search { background: #1a1a1a; color: #eee; border-color: #555; }\nhtml.mp-dark #mp-panel details { background: #303030; }\nhtml.mp-dark #mp-panel .mp-item { color: #9ec5ff; }\nhtml.mp-dark #mp-panel .mp-item:hover { background: #3a3a3a; }\nhtml.mp-dark #mp-panel .mp-big { background: #303030; border-color: #444; }\nhtml.mp-dark #mp-panel .mp-empty { color: #aaa; }\n\n/* Essentials: כוכבים ועריכה */\n#mp-panel .mp-row { display: flex; align-items: center; }\n#mp-panel .mp-row .mp-item { flex: 1; }\n#mp-panel .mp-star { border: 0; background: transparent; cursor: pointer; font-size: 18px; padding: 4px 10px; color: #999; }\n#mp-panel .mp-star.on { color: #f5b301; }\n#mp-panel .mp-edit { display: flex; align-items: center; gap: 6px; padding: 6px; margin-bottom: 6px; border-radius: 10px; background: #f3f6fb; }\n#mp-panel .mp-edit span { flex: 1; font-weight: bold; }\n#mp-panel .mp-edit .mp-icon { width: 42px; text-align: center; font-size: 16px; padding: 4px; border: 1px solid #bbb; border-radius: 6px; }\n#mp-panel .mp-edit button, #mp-panel .mp-tools button { border: 1px solid #bbb; background: #fff; border-radius: 6px; cursor: pointer; padding: 4px 8px; font: inherit; color: inherit; }\n#mp-panel .mp-tools { display: flex; gap: 6px; margin-top: 4px; }\n#mp-panel .mp-tools button { flex: 1; padding: 7px; }\nhtml.mp-dark #mp-panel .mp-edit { background: #303030; }\nhtml.mp-dark #mp-panel .mp-edit .mp-icon, html.mp-dark #mp-panel .mp-edit button, html.mp-dark #mp-panel .mp-tools button { background: #1a1a1a; color: #eee; border-color: #555; }\n";
+    st.textContent = "/* =====================================================================\n   מצב כהה\n   הפילטר (invert + hue-rotate) לא מסוגל להציג צבעים רוויים, לכן אלמנטים\n   שצבועים באקסנט (.mp-tint) נשארים מחוץ לפילטר, והפילטר מוחל רק על\n   האזורים שסביבם. אם אין אלמנט כזה, הפילטר מוחל על כל ה-body.\n   ===================================================================== */\nhtml.mp-dark { background: #1a1a1a; color-scheme: dark; }\n\nhtml.mp-dark body:not(:has(.mp-tint)) {\n  background: #fff;\n  filter: invert(0.9) hue-rotate(180deg);\n}\nhtml.mp-dark body:has(.mp-tint) {\n  background: #1a1a1a !important;\n  color: #e5e5e5;\n}\n/* אבות של אלמנט האקסנט: רקע כהה ישיר, בלי פילטר */\nhtml.mp-dark :has(.mp-tint):not(.mp-tint):not(html):not(body) {\n  background-color: #1a1a1a !important;\n  color: #e5e5e5;\n}\n/* האזורים שסביב: מסוננים בנפרד */\nhtml.mp-dark :has(.mp-tint) > :not(:has(.mp-tint)):not(.mp-tint):not(#mp-fab):not(#mp-panel):not(body) {\n  filter: invert(0.9) hue-rotate(180deg);\n}\n\n/* תמונות ווידאו חוזרים לצבעים רגילים (רק בתוך אזורים מסוננים) */\nhtml.mp-dark body:not(:has(.mp-tint)) :is(img, video, canvas, picture, iframe, [style*=\"background-image\"]),\nhtml.mp-dark :has(.mp-tint) > :not(:has(.mp-tint)):not(.mp-tint):not(#mp-fab):not(#mp-panel):not(body) :is(img, video, canvas, picture, iframe, [style*=\"background-image\"]) {\n  filter: invert(1) hue-rotate(180deg);\n}\n\n/* =====================================================================\n   אקסנט\n   --mp-accent        = הצבע המדויק (לאלמנטים שמחוץ לפילטר)\n   --mp-accent-f      = הצבע אחרי תיקון לפילטר (לקישורים וטאבים)\n   ===================================================================== */\nhtml.mp-accent .mp-tint {\n  background-color: var(--mp-accent) !important;\n  color: var(--mp-on-accent) !important;\n}\nhtml.mp-accent .mp-tint * {\n  color: var(--mp-on-accent) !important;\n}\n\nhtml.mp-accent a:not(.mp-item),\nhtml.mp-accent .mat-tab-label-active,\nhtml.mp-accent .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {\n  color: var(--mp-accent-f) !important;\n}\nhtml.mp-accent .mat-ink-bar,\nhtml.mp-accent .mdc-tab-indicator__content--underline {\n  background-color: var(--mp-accent-f) !important;\n  border-color: var(--mp-accent-f) !important;\n}\n\n/* =====================================================================\n   ציונים מעל הסף: זוהר\n   ===================================================================== */\n.mp-glow {\n  color: var(--mp-glow, #ffb300) !important;\n  font-weight: 700 !important;\n  text-shadow: 0 0 6px var(--mp-glow, #ffb300), 0 0 14px var(--mp-glow, #ffb300);\n  animation: mp-pulse 2.2s ease-in-out infinite;\n}\n@keyframes mp-pulse {\n  50% {\n    text-shadow: 0 0 12px var(--mp-glow, #ffb300), 0 0 28px var(--mp-glow, #ffb300);\n  }\n}\n\n/* =====================================================================\n   ניווט מהיר (נמצא מחוץ ל-body ולכן אף פעם לא מסונן)\n   ===================================================================== */\n#mp-fab {\n  position: fixed; left: 16px; bottom: 16px; z-index: 2147483000;\n  width: 48px; height: 48px; border-radius: 50%; border: 0; cursor: pointer;\n  background: var(--mp-accent, #1565c0); color: var(--mp-on-accent, #fff); font-size: 22px;\n  box-shadow: 0 2px 8px rgba(0,0,0,.35);\n}\n#mp-panel {\n  position: fixed; left: 16px; bottom: 72px; z-index: 2147483000;\n  width: 300px; max-height: 70vh; overflow: auto; direction: rtl;\n  background: #fff; color: #222; border-radius: 12px; padding: 10px;\n  border: 1px solid #999;\n  box-shadow: 0 4px 18px rgba(0,0,0,.35); font: 14px/1.4 Arial, sans-serif;\n  display: none;\n}\n#mp-panel.open { display: block; }\n#mp-tabs { display: flex; gap: 6px; margin-bottom: 8px; }\n#mp-tabs button {\n  flex: 1; padding: 7px; border: 1px solid #bbb; border-radius: 8px; cursor: pointer;\n  background: #f3f6fb; color: #222; font: inherit; font-weight: bold;\n}\n#mp-tabs button.on {\n  background: var(--mp-accent, #1565c0); color: var(--mp-on-accent, #fff);\n  border-color: transparent;\n}\n#mp-search {\n  width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px;\n  border: 1px solid #bbb; border-radius: 8px; font-size: 14px;\n  background: #fff; color: #222;\n}\n#mp-panel details { margin-bottom: 4px; border-radius: 8px; background: #f3f6fb; }\n#mp-panel summary { cursor: pointer; padding: 8px 10px; font-weight: bold; }\n#mp-panel .mp-item {\n  display: block; width: 100%; text-align: right; box-sizing: border-box;\n  padding: 7px 18px; border: 0; background: transparent; cursor: pointer;\n  font: inherit; color: #0d47a1;\n}\n#mp-panel .mp-item:hover { background: #dce8f8; }\n#mp-panel .mp-big {\n  padding: 12px 14px; margin-bottom: 6px; border-radius: 10px; font-size: 16px;\n  font-weight: bold; background: #f3f6fb; border: 1px solid #d5deec;\n}\n#mp-panel .mp-empty { padding: 8px; color: #666; }\n\n/* החלונית במצב כהה */\nhtml.mp-dark #mp-panel { background: #262626; color: #eee; border-color: #555; }\nhtml.mp-dark #mp-tabs button { background: #333; color: #eee; border-color: #555; }\nhtml.mp-dark #mp-tabs button.on { background: var(--mp-accent); color: var(--mp-on-accent); }\nhtml.mp-dark #mp-search { background: #1a1a1a; color: #eee; border-color: #555; }\nhtml.mp-dark #mp-panel details { background: #303030; }\nhtml.mp-dark #mp-panel .mp-item { color: #9ec5ff; }\nhtml.mp-dark #mp-panel .mp-item:hover { background: #3a3a3a; }\nhtml.mp-dark #mp-panel .mp-big { background: #303030; border-color: #444; }\nhtml.mp-dark #mp-panel .mp-empty { color: #aaa; }\n\n/* Essentials: כוכבים ועריכה */\n#mp-panel .mp-row { display: flex; align-items: center; }\n#mp-panel .mp-row .mp-item { flex: 1; }\n#mp-panel .mp-star { border: 0; background: transparent; cursor: pointer; font-size: 18px; padding: 4px 10px; color: #999; }\n#mp-panel .mp-star.on { color: #f5b301; }\n#mp-panel .mp-edit { display: flex; align-items: center; gap: 6px; padding: 6px; margin-bottom: 6px; border-radius: 10px; background: #f3f6fb; }\n#mp-panel .mp-edit span { flex: 1; font-weight: bold; }\n#mp-panel .mp-edit .mp-icon { width: 42px; text-align: center; font-size: 16px; padding: 4px; border: 1px solid #bbb; border-radius: 6px; }\n#mp-panel .mp-edit button, #mp-panel .mp-tools button { border: 1px solid #bbb; background: #fff; border-radius: 6px; cursor: pointer; padding: 4px 8px; font: inherit; color: inherit; }\n#mp-panel .mp-tools { display: flex; gap: 6px; margin-top: 4px; }\n#mp-panel .mp-tools button { flex: 1; padding: 7px; }\nhtml.mp-dark #mp-panel .mp-edit { background: #303030; }\nhtml.mp-dark #mp-panel .mp-edit .mp-icon, html.mp-dark #mp-panel .mp-edit button, html.mp-dark #mp-panel .mp-tools button { background: #1a1a1a; color: #eee; border-color: #555; }\n\n/* ---------- \"אל תראה לי\" ---------- */\nhtml.mp-hide-grades .mp-gr:not(.mp-reveal) {\n  filter: blur(7px) !important;\n  cursor: pointer;\n  user-select: none;\n}\n\n/* ---------- ממוצע ציונים ---------- */\n#mp-avg {\n  direction: rtl; margin: 8px 0 14px; padding: 12px 14px; border-radius: 12px;\n  background: #eef3fb; color: #1b2230; font: 14px/1.4 Arial, sans-serif;\n  border: 1px solid #d5deec;\n}\n#mp-avg .mp-avg-head { display: flex; align-items: center; justify-content: space-between; font-size: 17px; font-weight: bold; margin-bottom: 8px; }\n#mp-avg .mp-avg-chips { display: flex; flex-wrap: wrap; gap: 6px; }\n#mp-avg .mp-avg-chip { display: flex; gap: 8px; align-items: center; background: #fff; border: 1px solid #d5deec; border-radius: 20px; padding: 4px 10px; }\n#mp-avg .mp-avg-n { display: inline-flex; gap: 4px; align-items: center; font-variant-numeric: tabular-nums; }\n#mp-avg i { font-style: normal; font-size: 12px; }\n#mp-avg i.up { color: #1a8a3a; }\n#mp-avg i.down { color: #c62828; }\n#mp-avg i.same { color: #888; }\n\n/* ---------- ערכות נושא ---------- */\n#mp-fx { position: fixed; inset: 0; pointer-events: none; z-index: 2147482000; overflow: hidden; }\n#mp-fx span { position: absolute; }\nhtml.mp-theme-space #mp-fx span {\n  width: 2px; height: 2px; border-radius: 50%; background: #fff; opacity: .5;\n  box-shadow: 0 0 4px #fff; animation: mp-twinkle ease-in-out infinite;\n}\n@keyframes mp-twinkle { 50% { opacity: .05; } }\nhtml.mp-theme-winter #mp-fx span { color: #dff3ff; opacity: .55; animation: mp-snow linear infinite; }\n@keyframes mp-snow { to { transform: translate(30px, 110vh) rotate(180deg); } }\nhtml.mp-theme-neon .mp-tint { box-shadow: 0 0 14px var(--mp-accent), 0 0 30px var(--mp-accent) !important; }\nhtml.mp-theme-neon #mp-fab, html.mp-theme-neon #mp-tabs button.on { box-shadow: 0 0 14px var(--mp-accent), 0 0 28px var(--mp-accent); }\nhtml.mp-theme-neon #mp-panel { border-color: var(--mp-accent); box-shadow: 0 0 18px var(--mp-accent); }\nhtml.mp-theme-neon .mp-tint * { text-shadow: 0 0 6px var(--mp-on-accent); }\n@media (prefers-reduced-motion: reduce) { #mp-fx span { animation: none !important; } }\n";
     document.documentElement.appendChild(st);
 (() => {
   const DEFAULTS = MP_DEFAULTS;
@@ -133,6 +142,7 @@ const MP_DEFAULTS = {
   }
   function applyTheme() {
     applyBase();
+    try { applyThemeFx(); } catch (e) {}
     applyFunny();
     markGrades();
     tintPrimary();
@@ -199,7 +209,8 @@ const MP_DEFAULTS = {
     return String(settings.funnyList || "")
       .split("\n")
       .map((l) => l.split("=>").map((x) => x.trim()))
-      .filter((p) => p.length === 2 && p[0] && p[1]);
+      .filter((p) => p.length === 2 && p[0] && p[1])
+      .sort((a, b) => b[0].length - a[0].length); // כלל ארוך קודם, כדי ש"שיעורי בית אחרונים" לא ייתפס כ"שיעורי בית"
   }
   function funnify(text) {
     if (!settings.funny) return text;
@@ -333,13 +344,10 @@ const MP_DEFAULTS = {
     location.reload();
   }, 30 * 1000);
 
-  /* ---------- זוהר לציונים ---------- */
+  /* ---------- ציונים: זוהר, "אל תראה לי", ממוצע ---------- */
   const GRADE_PATH = /grade|mark|score|ציון/i;
   function markGrades() {
-    document.querySelectorAll(".mp-glow").forEach((e) => {
-      if (!settings.glow) e.classList.remove("mp-glow");
-    });
-    if (!settings.glow || !document.body) return;
+    if (!document.body) return;
     const pathOk = GRADE_PATH.test(decodeURIComponent(location.pathname));
     document
       .querySelectorAll(
@@ -348,14 +356,149 @@ const MP_DEFAULTS = {
       .forEach((el) => {
         if (el.children.length || el.closest("#mp-panel")) return;
         const t = el.textContent.trim();
-        if (!/^\d{2,3}(\.\d+)?$/.test(t)) return;
+        if (!/^\d{2,3}(\.\d+)?$/.test(t)) {
+          el.classList.remove("mp-glow", "mp-gr");
+          return;
+        }
         const v = parseFloat(t);
-        const ok = v >= settings.glowMin && v <= 100;
-        const inGradeCtx =
-          pathOk || el.closest("[class*=grade],[class*=mark],[class*=score]");
-        el.classList.toggle("mp-glow", ok && !!inGradeCtx);
+        const inGradeCtx = !!(pathOk || el.closest("[class*=grade],[class*=mark],[class*=score],#mp-avg"));
+        const isGrade = inGradeCtx && v >= 0 && v <= 100;
+        el.classList.toggle("mp-gr", isGrade);
+        el.classList.toggle("mp-glow", isGrade && settings.glow && v >= settings.glowMin);
       });
+    document.documentElement.classList.toggle("mp-hide-grades", !!settings.hideGrades);
+    try { renderAverage(); } catch (e) {}
   }
+  // "אל תראה לי": נגיעה בציון חושפת אותו
+  document.addEventListener("click", (e) => {
+    if (!settings.hideGrades) return;
+    const g = e.target.closest && e.target.closest(".mp-gr");
+    if (g && !g.classList.contains("mp-reveal")) {
+      g.classList.add("mp-reveal");
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  }, true);
+
+  function parseDate(t) {
+    const m = String(t).match(/(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})/);
+    if (!m) return null;
+    const y = m[3].length === 2 ? 2000 + +m[3] : +m[3];
+    return new Date(y, m[2] - 1, m[1]).getTime();
+  }
+  // טבלת הציונים: לפי כותרות העמודות "מקצוע" ו"ציון"
+  function readGrades() {
+    const heads = [...document.querySelectorAll("th, mat-header-cell, [role=columnheader]")];
+    const gH = heads.find((h) => /^ציון$/.test(h.textContent.trim()));
+    const sH = heads.find((h) => /מקצוע/.test(h.textContent));
+    if (!gH || !sH || gH.parentElement !== sH.parentElement) return null;
+    const headRow = gH.parentElement;
+    const cols = [...headRow.children];
+    const gi = cols.indexOf(gH), si = cols.indexOf(sH);
+    const di = cols.findIndex((c) => /תאריך/.test(c.textContent));
+    const table = headRow.closest("table, mat-table, [role=table], [role=grid]") || headRow.parentElement;
+    const rows = [...table.querySelectorAll("tr, mat-row, [role=row]")].filter(
+      (r) => r !== headRow && r.children.length === cols.length
+    );
+    const data = rows
+      .map((r, i) => {
+        const c = [...r.children];
+        return {
+          subj: origText(c[si]).trim(),
+          g: parseFloat(c[gi].textContent.trim()),
+          date: di >= 0 ? parseDate(c[di].textContent) : null,
+          i,
+        };
+      })
+      .filter((x) => x.subj && !isNaN(x.g) && x.g >= 0 && x.g <= 100);
+    return { table, data };
+  }
+  const mean = (a) => a.reduce((s, x) => s + x.g, 0) / a.length;
+  function trend(list) {
+    // הממוצע עכשיו לעומת הממוצע בלי הציון האחרון
+    if (list.length < 2) return { v: mean(list), arrow: "" };
+    const sorted = list[0].date !== null
+      ? [...list].sort((a, b) => a.date - b.date)
+      : [...list].sort((a, b) => b.i - a.i); // בלי תאריכים: מניחים שהחדש למעלה
+    const now = mean(sorted), before = mean(sorted.slice(0, -1));
+    const d = now - before;
+    return { v: now, arrow: d > 0.05 ? "▲" : d < -0.05 ? "▼" : "•", d };
+  }
+  let avgSig = "";
+  function renderAverage() {
+    const old = document.getElementById("mp-avg");
+    if (!settings.avg) { if (old) old.remove(); avgSig = ""; return; }
+    const r = readGrades();
+    if (!r || r.data.length < 1) { if (old) old.remove(); avgSig = ""; return; }
+    const sig = JSON.stringify(r.data.map((x) => [x.subj, x.g, x.date]));
+    if (old && sig === avgSig && old.nextElementSibling === r.table) return;
+    avgSig = sig;
+    const bySubj = new Map();
+    r.data.forEach((x) => { if (!bySubj.has(x.subj)) bySubj.set(x.subj, []); bySubj.get(x.subj).push(x); });
+    const box = old || document.createElement("div");
+    box.id = "mp-avg";
+    box.textContent = "";
+    const fmt = (t) => {
+      const span = document.createElement("span");
+      span.className = "mp-avg-n";
+      const n = document.createElement("b");
+      n.textContent = t.v.toFixed(1);
+      span.append(n);
+      if (t.arrow) {
+        const a = document.createElement("i");
+        a.className = t.arrow === "▲" ? "up" : t.arrow === "▼" ? "down" : "same";
+        a.textContent = t.arrow;
+        a.title = t.d ? (t.d > 0 ? "+" : "") + t.d.toFixed(1) + " מאז הציון האחרון" : "";
+        span.append(a);
+      }
+      return span;
+    };
+    const head = document.createElement("div");
+    head.className = "mp-avg-head";
+    const hl = document.createElement("span");
+    hl.textContent = "📊 ממוצע כללי";
+    head.append(hl, fmt(trend(r.data)));
+    const chips = document.createElement("div");
+    chips.className = "mp-avg-chips";
+    [...bySubj].sort((a, b) => a[0].localeCompare(b[0], "he")).forEach(([subj, list]) => {
+      const c = document.createElement("div");
+      c.className = "mp-avg-chip";
+      const nm = document.createElement("span");
+      nm.textContent = subj + (list.length > 1 ? ` (${list.length})` : "");
+      c.append(nm, fmt(trend(list)));
+      chips.append(c);
+    });
+    box.append(head, chips);
+    if (box.parentElement !== r.table.parentElement || box.nextElementSibling !== r.table) {
+      r.table.parentElement.insertBefore(box, r.table);
+    }
+  }
+
+  /* ---------- ערכות נושא ---------- */
+  function applyThemeFx() {
+    const root = document.documentElement;
+    ["space", "neon", "winter"].forEach((t) => root.classList.toggle("mp-theme-" + t, settings.theme === t));
+    let fx = document.getElementById("mp-fx");
+    if (settings.theme !== "space" && settings.theme !== "winter") { if (fx) fx.remove(); return; }
+    if (fx && fx.dataset.t === settings.theme) return;
+    if (fx) fx.remove();
+    fx = document.createElement("div");
+    fx.id = "mp-fx";
+    fx.dataset.t = settings.theme;
+    const n = settings.theme === "winter" ? 28 : 60;
+    for (let i = 0; i < n; i++) {
+      const p = document.createElement("span");
+      p.textContent = settings.theme === "winter" ? "❄" : "";
+      p.style.left = (Math.random() * 100).toFixed(1) + "%";
+      p.style.top = settings.theme === "space" ? (Math.random() * 100).toFixed(1) + "%" : "-5%";
+      p.style.animationDelay = (-Math.random() * 12).toFixed(1) + "s";
+      p.style.animationDuration = (settings.theme === "winter" ? 8 + Math.random() * 8 : 2 + Math.random() * 4).toFixed(1) + "s";
+      p.style.fontSize = (8 + Math.random() * 10).toFixed(0) + "px";
+      fx.append(p);
+    }
+    root.append(fx);
+  }
+
 
   /* ---------- קטגוריות ---------- */
   const CATEGORIES = [

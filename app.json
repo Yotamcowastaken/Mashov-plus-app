@@ -2,7 +2,7 @@
   "expo": {
     "name": "משוב פלוס",
     "slug": "mashov-plus",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "android": {
@@ -11,7 +11,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "versionCode": 8
+      "versionCode": 9
     },
     "icon": "./assets/icon.png",
     "plugins": [
