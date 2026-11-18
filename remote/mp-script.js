@@ -602,11 +602,11 @@ const MP_DEFAULTS = {
       if (e.key === "Escape") toggle(false);
     });
     document.addEventListener("keydown", (e) => {
-      if (e.altKey && e.key.toLowerCase() === "m") { e.preventDefault(); toggle(); }
+      if (e.altKey && e.key.toLowerCase() === "m") { e.preventDefault(); toggle(undefined, true); }
     });
   }
 
-  function toggle(force) {
+  function toggle(force, viaKey) {
     const open = typeof force === "boolean" ? force : !panel.classList.contains("open");
     panel.classList.toggle("open", open);
     ls.set("mp-open", open ? "1" : "0");
@@ -614,7 +614,7 @@ const MP_DEFAULTS = {
       ensureMenuRendered();
       scan();
       render();
-      search.focus();
+      if (viaKey) search.focus(); // מקלדת רק כשפותחים מהמקלדת (Alt+M), לא בנגיעה
     }
   }
 
@@ -763,6 +763,12 @@ const MP_DEFAULTS = {
         list.append(det);
       });
   }
+
+  document.addEventListener("focusin", (e) => {
+    const t = e.target;
+    if (!t || !/^(INPUT|TEXTAREA)$/.test(t.tagName)) return;
+    setTimeout(() => { try { t.scrollIntoView({ block: "center", behavior: "smooth" }); } catch (x) {} }, 350);
+  });
 
   /* ---------- אתחול ---------- */
   let observer, timer;

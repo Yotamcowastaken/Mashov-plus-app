@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
+  Dimensions,
+  Keyboard,
   Linking,
   BackHandler,
   Modal,
@@ -45,6 +47,20 @@ const THEMES = [
   ["neon", "💜 ניאון", "#ff2bd6"],
   ["winter", "❄️ חורף", "#4fc3f7"],
 ];
+// רשימת המקורות הידועים (קבועה, אי אפשר לערוך אותה)
+const parseFunny = (t) => {
+  const m = new Map();
+  String(t || "").split("\n").forEach((l) => {
+    const p = l.split("=>");
+    if (p.length === 2 && p[0].trim()) m.set(p[0].trim(), p[1].trim());
+  });
+  return m;
+};
+const KNOWN = (() => {
+  const set = [];
+  Object.values(PACKS).forEach((p) => parseFunny(p.text).forEach((_, k) => { if (!set.includes(k)) set.push(k); }));
+  return set;
+})();
 const SWATCHES = ["#1d8fa8", "#e53935", "#8e24aa", "#43a047", "#fb8c00", "#3f51b5", "#00897b", "#f06292"];
 
 // מחוץ לקומפוננטה, כדי ששדות טקסט לא יאבדו פוקוס בכל הקלדה
@@ -85,6 +101,9 @@ function Main() {
   const [listKey, setListKey] = useState(0);
   const [essKey, setEssKey] = useState(0);
   const [sec, setSec] = useState("look");
+  const [draft, setDraft] = useState(null); // Map: מקור -> שם מצחיק (עד ששומרים)
+  const [kb, setKb] = useState(0);
+  const scrollRef = useRef(null);
   const [ioText, setIoText] = useState("");
   const [ioMsg, setIoMsg] = useState("");
   const web = useRef(null);
@@ -170,6 +189,23 @@ function Main() {
     return () => sub.remove();
   }, [open]);
 
+  // מקלדת: אם המסך לא מתכווץ לבד (edge-to-edge), מוסיפים ריווח בגובה המקלדת
+  useEffect(() => {
+    const full = Dimensions.get("window").height;
+    const a = Keyboard.addListener("keyboardDidShow", (e) => {
+      const shrunk = full - Dimensions.get("window").height > 50;
+      setKb(shrunk ? 0 : e.endCoordinates.height);
+    });
+    const b = Keyboard.addListener("keyboardDidHide", () => setKb(0));
+    return () => { a.remove(); b.remove(); };
+  }, []);
+  const focusScroll = (e) => {
+    const h = e && e.target;
+    setTimeout(() => {
+      try { scrollRef.current && scrollRef.current.scrollResponderScrollNativeHandleToKeyboard(h, 140, true); } catch (x) {}
+    }, 300);
+  };
+
   const cfg = { ...DEFAULTS, listen: true, hideOrig: true, ...(store || {}) };
 
   // מאזין להתראות של אפליקציית משוב (קוד אנדרואיד מקורי)
@@ -237,7 +273,7 @@ function Main() {
 
 
   return (
-    <View style={[s.root, { paddingTop: top, paddingBottom: bottom }]}>
+    <View style={[s.root, { paddingTop: top, paddingBottom: open ? bottom : Math.max(bottom, kb) }]}>
       {newApk && !hideBar ? (
         <View style={s.updBar}>
           <TouchableOpacity style={{ flex: 1 }} onPress={installUpdate}>
@@ -269,12 +305,12 @@ function Main() {
       </View>
 
       <Modal onShow={checkListen} visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={[s.modal, { paddingTop: top + 8 }]}>
+        <View style={[s.modal, { paddingTop: top + 8, paddingBottom: kb }]}>
           <View style={s.head}>
             <TouchableOpacity onPress={() => setOpen(false)}><Text style={s.done}>סגור</Text></TouchableOpacity>
             <Text style={s.title}>משוב פלוס</Text>
           </View>
-          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 + bottom }} keyboardShouldPersistTaps="handled">
+          <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16, paddingBottom: 60 + bottom }} keyboardShouldPersistTaps="handled">
             <View style={[s.row, { flexDirection: "column", alignItems: "flex-end" }]}>
               <Text style={s.label}>גרסת אפליקציה: build {BUILD || "פיתוח"}</Text>
               <Text style={[s.sub, { marginTop: 4 }]}>{scriptDate ? `התכונות עודכנו אוטומטית ב-${scriptDate}` : "התכונות מגרסת ההתקנה"}</Text>
@@ -312,7 +348,7 @@ function Main() {
               </View>
               <TextInput style={s.input} value={hex || cfg.accent}
                 onChangeText={(t) => { setHex(t); if (/^#[0-9a-fA-F]{6}$/.test(t)) update({ accent: t }); }}
-                onBlur={() => setHex("")} autoCapitalize="none" autoCorrect={false}
+                onFocus={focusScroll} onBlur={() => setHex("")} autoCapitalize="none" autoCorrect={false}
                 placeholder="#1d8fa8" placeholderTextColor="#777" />
             </Section>
 
@@ -342,14 +378,53 @@ function Main() {
               <View style={s.chips}>
                 {Object.entries(PACKS).map(([id, p]) => (
                   <TouchableOpacity key={id} style={[s.chip, cfg.funnyList === p.text && s.chipOn]}
-                    onPress={() => { update({ funnyList: p.text }); setListKey((k) => k + 1); }}>
+                    onPress={() => { update({ funnyList: p.text }); setDraft(null); setListKey((k) => k + 1); }}>
                     <Text style={s.btnT}>{p.name}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-              <Text style={s.sub}>כל שורה: הטקסט באתר =&gt; הטקסט המצחיק</Text>
-              <TextInput key={listKey} style={[s.input, s.list]} multiline defaultValue={cfg.funnyList}
-                onEndEditing={(e) => update({ funnyList: e.nativeEvent.text })} autoCorrect={false} textAlign="right" />
+              {(() => {
+                const saved = parseFunny(cfg.funnyList);
+                const cur = draft || saved;
+                const keys = [...KNOWN, ...[...saved.keys()].filter((k) => !KNOWN.includes(k))];
+                const dirty = draft !== null;
+                const save = () => {
+                  const text = keys.filter((k) => (cur.get(k) || "").trim()).map((k) => `${k} => ${cur.get(k).trim()}`).join("\n");
+                  update({ funnyList: text });
+                  setDraft(null);
+                  Keyboard.dismiss();
+                };
+                return (
+                  <View>
+                    <Text style={s.sub}>מימין השם במשוב (קבוע). משמאל השם המצחיק. שדה ריק = בלי החלפה.</Text>
+                    {keys.map((k) => (
+                      <View key={k} style={s.fRow}>
+                        <Text style={s.fOrig} numberOfLines={2}>{k}</Text>
+                        <TextInput
+                          style={s.fInput}
+                          value={cur.get(k) || ""}
+                          placeholder="—"
+                          placeholderTextColor="#666"
+                          onFocus={focusScroll}
+                          onChangeText={(t) => { const m = new Map(cur); m.set(k, t); setDraft(m); }}
+                          autoCorrect={false}
+                          textAlign="right"
+                        />
+                      </View>
+                    ))}
+                    <View style={s.saveBar}>
+                      <TouchableOpacity style={[s.btn, s.saveBtn, !dirty && { opacity: 0.5 }]} disabled={!dirty} onPress={save}>
+                        <Text style={s.btnT}>{dirty ? "💾 שמור שינויים" : "✓ נשמר"}</Text>
+                      </TouchableOpacity>
+                      {dirty ? (
+                        <TouchableOpacity style={[s.btn, { flex: 1 }]} onPress={() => { setDraft(null); Keyboard.dismiss(); }}>
+                          <Text style={s.btnT}>בטל</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })()}
             </Section>
 
             <Section open={sec === "nav"} onToggle={() => setSec(sec === "nav" ? "" : "nav")} title="⭐ ניווט וגישה מהירה">
@@ -358,7 +433,7 @@ function Main() {
               </Row>
               <Text style={s.sub}>גישה מהירה: כל שורה היא אייקון ושם הפריט המקורי בתפריט. אפשר גם ללחוץ ☆ ליד פריט בטאב "הכל".</Text>
               <TextInput key={"ess" + essKey} style={[s.input, s.list, { minHeight: 120 }]} multiline defaultValue={cfg.essList}
-                onEndEditing={(e) => update({ essList: e.nativeEvent.text })} autoCorrect={false} textAlign="right" />
+                onFocus={focusScroll} onEndEditing={(e) => update({ essList: e.nativeEvent.text })} autoCorrect={false} textAlign="right" />
               <TouchableOpacity style={s.btn} onPress={() => { update({ essList: ESS_TEXT }); setEssKey((k) => k + 1); }}>
                 <Text style={s.btnT}>↩︎ אפס גישה מהירה לברירת מחדל</Text>
               </TouchableOpacity>
@@ -422,7 +497,7 @@ function Main() {
                 <Text style={s.btnT}>📤 ייצוא ושיתוף</Text>
               </TouchableOpacity>
               <TextInput style={[s.input, { minHeight: 70, textAlign: "left" }]} multiline value={ioText} onChangeText={setIoText}
-                placeholder="הדביקו כאן גיבוי" placeholderTextColor="#777" autoCorrect={false} autoCapitalize="none" />
+                onFocus={focusScroll} placeholder="הדביקו כאן גיבוי" placeholderTextColor="#777" autoCorrect={false} autoCapitalize="none" />
               <TouchableOpacity style={s.btn} onPress={() => {
                 let d;
                 try { d = JSON.parse(ioText.slice(ioText.indexOf("{"), ioText.lastIndexOf("}") + 1)); } catch (e) { setIoMsg("לא נמצא קוד הגדרות בטקסט"); return; }
@@ -478,6 +553,11 @@ const s = StyleSheet.create({
   chips: { flexDirection: "row-reverse", flexWrap: "wrap", gap: 8 },
   chip: { backgroundColor: "#333", borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 2, borderColor: "transparent" },
   chipOn: { borderColor: "#6cb8ff" },
+  fRow: { flexDirection: "row-reverse", alignItems: "center", gap: 8, marginTop: 6 },
+  fOrig: { width: "40%", color: "#9a9aa2", fontSize: 14, textAlign: "right" },
+  fInput: { flex: 1, backgroundColor: "#262626", color: "#eee", borderRadius: 10, paddingVertical: 8, paddingHorizontal: 10 },
+  saveBar: { flexDirection: "row-reverse", gap: 8, marginTop: 10 },
+  saveBtn: { flex: 2, backgroundColor: "#1d6fa8", marginTop: 12 },
   updBar: { flexDirection: "row-reverse", alignItems: "center", backgroundColor: "#1d6fa8", paddingHorizontal: 12, paddingVertical: 8 },
   updText: { color: "#fff", fontSize: 14, textAlign: "right" },
   updX: { color: "#fff", fontSize: 18, paddingHorizontal: 8 },
