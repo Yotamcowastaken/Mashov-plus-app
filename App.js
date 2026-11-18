@@ -126,7 +126,7 @@ function Main() {
         <View style={[s.modal, { paddingTop: top + 8 }]}>
           <View style={s.head}>
             <TouchableOpacity onPress={() => setOpen(false)}><Text style={s.done}>סגור</Text></TouchableOpacity>
-            <Text style={s.title}>משו״ב פלוס</Text>
+            <Text style={s.title}>משוב פלוס</Text>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 + bottom }} keyboardShouldPersistTaps="handled">
             <Row label="מצב כהה">

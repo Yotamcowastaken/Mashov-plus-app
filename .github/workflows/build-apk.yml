@@ -53,5 +53,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: משו״ב פלוס (build ${{ github.run_number }})
+          name: משוב פלוס (build ${{ github.run_number }})
           files: build/android/app/build/outputs/apk/release/app-release.apk
