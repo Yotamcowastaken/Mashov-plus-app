@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   AppState,
+  Linking,
   BackHandler,
   Modal,
   Platform,
@@ -20,8 +21,15 @@ import * as Notifications from "expo-notifications";
 import MashovListener from "./modules/mashov-listener";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { SCRIPT, DEFAULTS, FUNNY_TEXT, ESS_TEXT } from "./mp";
+import BUILD_INFO from "./build-info.json";
 
 const STORE_KEY = "mp-store";
+const SCRIPT_KEY = "mp-remote-script";
+const REPO = "Yotamcowastaken/Mashov-plus-app";
+const SCRIPT_URL = `https://raw.githubusercontent.com/${REPO}/main/remote/mp-script.js`;
+const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
+const BUILD = (BUILD_INFO && BUILD_INFO.build) || 0;
+const validScript = (t) => typeof t === "string" && t.length > 1000 && t.startsWith("(function () {") && t.includes("__mpBooted");
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -63,11 +71,63 @@ function Main() {
     })();
   }, []);
 
+  const [script, setScript] = useState(SCRIPT);
+  const [scriptDate, setScriptDate] = useState("");
+  const [newApk, setNewApk] = useState(null); // { build, url }
+  const [updState, setUpdState] = useState("");
+  const [hideBar, setHideBar] = useState(false);
+
   useEffect(() => {
-    AsyncStorage.getItem(STORE_KEY)
-      .then((v) => setStore(v ? JSON.parse(v) : {}))
-      .catch(() => setStore({}));
+    Promise.all([
+      AsyncStorage.getItem(STORE_KEY).catch(() => null),
+      AsyncStorage.getItem(SCRIPT_KEY).catch(() => null),
+    ]).then(([v, sc]) => {
+      try {
+        const saved = sc ? JSON.parse(sc) : null;
+        if (saved && validScript(saved.code)) { setScript(saved.code); setScriptDate(saved.date || ""); }
+      } catch (e) {}
+      try { setStore(v ? JSON.parse(v) : {}); } catch (e) { setStore({}); }
+    });
+
+    // 1. הקוד שרץ בדף משוב: הגרסה האחרונה מ-GitHub, נכנסת לתוקף בטעינה הבאה של הדף
+    fetch(SCRIPT_URL + "?t=" + Date.now(), { cache: "no-store" })
+      .then((r) => (r.ok ? r.text() : null))
+      .then((code) => {
+        if (!validScript(code)) return;
+        AsyncStorage.getItem(SCRIPT_KEY).then((old) => {
+          let prev = null;
+          try { prev = old ? JSON.parse(old).code : null; } catch (e) {}
+          if (prev === code) return;
+          const date = new Date().toLocaleDateString("he-IL");
+          AsyncStorage.setItem(SCRIPT_KEY, JSON.stringify({ code, date })).catch(() => {});
+          setScript(code); setScriptDate(date);
+        });
+      })
+      .catch(() => {});
+
+    // 2. בדיקה אם יצאה גרסת APK חדשה
+    if (BUILD > 0) {
+      fetch(RELEASES_URL)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((rel) => {
+          const n = rel && parseInt(String(rel.tag_name || "").replace("build-", ""), 10);
+          const asset = rel && (rel.assets || []).find((a) => a.name.endsWith(".apk"));
+          if (n > BUILD && asset) setNewApk({ build: n, url: asset.browser_download_url });
+        })
+        .catch(() => {});
+    }
   }, []);
+
+  const installUpdate = useCallback(() => {
+    if (!newApk) return;
+    if (!MashovListener || !MashovListener.installApk) { Linking.openURL(newApk.url); return; }
+    try {
+      const r = MashovListener.installApk(newApk.url);
+      setUpdState(r === "need-permission"
+        ? "אשרו \"התקנת אפליקציות לא ידועות\" למשוב פלוס, חזרו ולחצו שוב"
+        : "מוריד... מסך ההתקנה ייפתח בסיום");
+    } catch (e) { Linking.openURL(newApk.url); }
+  }, [newApk]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -139,7 +199,7 @@ function Main() {
 
   if (store === null) return <View style={s.root} />;
 
-  const injected = `window.__MP_INITIAL = ${JSON.stringify(store)};\n${SCRIPT}\ntrue;`;
+  const injected = `window.__MP_INITIAL = ${JSON.stringify(store)};\n${script}\ntrue;`;
   const top = insets.top || (Platform.OS === "android" ? RNStatusBar.currentHeight || 0 : 40);
   const bottom = insets.bottom;
 
@@ -152,6 +212,14 @@ function Main() {
 
   return (
     <View style={[s.root, { paddingTop: top, paddingBottom: bottom }]}>
+      {newApk && !hideBar ? (
+        <View style={s.updBar}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={installUpdate}>
+            <Text style={s.updText}>{updState || `⬆️ גרסה חדשה זמינה (build ${newApk.build}). לחצו לעדכון`}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setHideBar(true)}><Text style={s.updX}>✕</Text></TouchableOpacity>
+        </View>
+      ) : null}
       <View style={{ flex: 1 }}>
       <StatusBar style="light" backgroundColor="#1a1a1a" />
       <WebView
@@ -181,6 +249,17 @@ function Main() {
             <Text style={s.title}>משוב פלוס</Text>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 + bottom }} keyboardShouldPersistTaps="handled">
+            <View style={[s.row, { flexDirection: "column", alignItems: "flex-end" }]}>
+              <Text style={s.label}>גרסת אפליקציה: build {BUILD || "פיתוח"}</Text>
+              <Text style={[s.sub, { marginTop: 4 }]}>{scriptDate ? `התכונות עודכנו אוטומטית ב-${scriptDate}` : "התכונות מגרסת ההתקנה"}</Text>
+              {newApk ? (
+                <TouchableOpacity style={[s.btn, { alignSelf: "stretch", backgroundColor: "#1d6fa8" }]} onPress={installUpdate}>
+                  <Text style={s.btnT}>{updState || `⬆️ עדכן ל-build ${newApk.build}`}</Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={[s.sub, { marginTop: 4 }]}>✅ זו הגרסה האחרונה</Text>
+              )}
+            </View>
             <Row label="מצב כהה">
               <Switch value={cfg.dark !== "off"} onValueChange={(v) => update({ dark: v ? "on" : "off" })} />
             </Row>
@@ -329,4 +408,7 @@ const s = StyleSheet.create({
   stepVal: { color: "#eee", fontSize: 16, minWidth: 90, textAlign: "center" },
   btn: { backgroundColor: "#333", borderRadius: 10, padding: 12, marginTop: 12, alignItems: "center" },
   btnT: { color: "#eee", fontSize: 15 },
+  updBar: { flexDirection: "row-reverse", alignItems: "center", backgroundColor: "#1d6fa8", paddingHorizontal: 12, paddingVertical: 8 },
+  updText: { color: "#fff", fontSize: 14, textAlign: "right" },
+  updX: { color: "#fff", fontSize: 18, paddingHorizontal: 8 },
 });
