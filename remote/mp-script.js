@@ -94,6 +94,39 @@ const MP_DEFAULTS = {
 (() => {
   const DEFAULTS = MP_DEFAULTS;
   let settings = { ...DEFAULTS };
+
+  /* ---------- שמירת החיבור באפליקציה ----------
+     משוב שומר את פרטי החיבור ב-sessionStorage, שנמחק כשאנדרואיד סוגר את האפליקציה.
+     באפליקציה בלבד: מגבים אותו ל-localStorage (שנשאר בטלפון) ומחזירים בפתיחה. */
+  if (window.ReactNativeWebView && /(^|\.)mashov\.info$/.test(location.hostname)) {
+    const KEY = "mp-ss-backup";
+    try {
+      const saved = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (saved && sessionStorage.length === 0) {
+        Object.keys(saved).forEach((k) => sessionStorage.setItem(k, saved[k]));
+      }
+    } catch (e) {}
+    const backup = () => {
+      try {
+        const o = {};
+        for (let i = 0; i < sessionStorage.length; i++) {
+          const k = sessionStorage.key(i);
+          o[k] = sessionStorage.getItem(k);
+        }
+        if (Object.keys(o).length) localStorage.setItem(KEY, JSON.stringify(o));
+        else localStorage.removeItem(KEY);
+      } catch (e) {}
+    };
+    try {
+      const P = Storage.prototype, set = P.setItem, rem = P.removeItem, clr = P.clear;
+      P.setItem = function (k, v) { const r = set.call(this, k, v); if (this === sessionStorage) backup(); return r; };
+      P.removeItem = function (k) { const r = rem.call(this, k); if (this === sessionStorage) backup(); return r; };
+      P.clear = function () { const r = clr.call(this); if (this === sessionStorage) backup(); return r; }; // התנתקות מכוונת מוחקת גם את הגיבוי
+    } catch (e) {}
+    document.addEventListener("visibilitychange", backup);
+    window.addEventListener("pagehide", backup);
+    setInterval(backup, 15000);
+  }
   const ls = {
     get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
     set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
