@@ -14,6 +14,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [full, lite]
     steps:
       - uses: actions/checkout@v4
 
@@ -29,10 +32,26 @@ jobs:
       - name: Create Expo project and copy app files
         run: |
           npx --yes create-expo-app@latest build --template blank --no-install
-          cp App.js mp.js app.json build-info.json build/
+          cp App.js mp.js app.json build/
           cp -r assets build/
-          cp -r modules build/
-          echo "{ \"build\": ${{ github.run_number }} }" > build/build-info.json
+          echo "{ \"build\": ${{ github.run_number }}, \"variant\": \"${{ matrix.variant }}\" }" > build/build-info.json
+
+      - name: Full version - native notification listener
+        if: matrix.variant == 'full'
+        run: cp -r modules build/
+
+      - name: Lite version - separate app, no notification access
+        if: matrix.variant == 'lite'
+        working-directory: build
+        run: |
+          node -e '
+            const fs = require("fs");
+            const m = JSON.parse(fs.readFileSync("app.json", "utf8"));
+            m.expo.name = "משוב פלוס לייט";
+            m.expo.slug = "mashov-plus-lite";
+            m.expo.android.package = "com.yotamco.mashovplus.lite";
+            fs.writeFileSync("app.json", JSON.stringify(m, null, 2));
+          '
 
       - name: Install dependencies
         working-directory: build
@@ -48,18 +67,31 @@ jobs:
         working-directory: build/android
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Name APK with build number
-        run: cp build/android/app/build/outputs/apk/release/app-release.apk mashov-plus-build-${{ github.run_number }}.apk
+      - name: Name APK
+        run: |
+          if [ "${{ matrix.variant }}" = "lite" ]; then N=mashov-plus-lite-build-${{ github.run_number }}.apk; else N=mashov-plus-build-${{ github.run_number }}.apk; fi
+          cp build/android/app/build/outputs/apk/release/app-release.apk "$N"
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: mashov-plus-apk
-          path: mashov-plus-build-${{ github.run_number }}.apk
+          name: apk-${{ matrix.variant }}
+          path: mashov-plus*.apk
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
           name: משוב פלוס (build ${{ github.run_number }})
-          files: mashov-plus-build-${{ github.run_number }}.apk
+          body: |
+            **mashov-plus-build-${{ github.run_number }}.apk** - הגרסה המלאה, עם התראות מאפליקציית משוב.
+            **mashov-plus-lite-build-${{ github.run_number }}.apk** - לייט: בלי גישה להתראות, ולכן Play Protect לא אמור לחסום. מתאים לחברים.
+          files: out/*.apk

@@ -94,6 +94,7 @@ const REPO = "Yotamcowastaken/Mashov-plus-app";
 const SCRIPT_URL = `https://raw.githubusercontent.com/${REPO}/main/remote/mp-script.js`;
 const RELEASES_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
 const BUILD = (BUILD_INFO && BUILD_INFO.build) || 0;
+const LITE = !!(BUILD_INFO && BUILD_INFO.variant === "lite");
 const validScript = (t) => typeof t === "string" && t.length > 1000 && t.startsWith("(function () {") && t.includes("__mpBooted");
 
 Notifications.setNotificationHandler({
@@ -233,7 +234,7 @@ function Main() {
         .then((r) => (r.ok ? r.json() : null))
         .then((rel) => {
           const n = rel && parseInt(String(rel.tag_name || "").replace("build-", ""), 10);
-          const asset = rel && (rel.assets || []).find((a) => a.name.endsWith(".apk"));
+          const asset = rel && (rel.assets || []).find((a) => a.name.endsWith(".apk") && a.name.includes("-lite-") === LITE);
           if (n > BUILD && asset) setNewApk({ build: n, url: asset.browser_download_url });
         })
         .catch(() => {});
@@ -407,7 +408,7 @@ function Main() {
           </View>
           <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 16, paddingBottom: 60 + bottom }} keyboardShouldPersistTaps="handled">
             <View style={[s.row, { flexDirection: "column", alignItems: "flex-end" }]}>
-              <Text style={s.label}>גרסת אפליקציה: build {BUILD || "פיתוח"}</Text>
+              <Text style={s.label}>גרסת אפליקציה: build {BUILD || "פיתוח"}{LITE ? " (לייט)" : ""}</Text>
               <Text style={[s.sub, { marginTop: 4 }]}>{scriptDate ? `התכונות עודכנו אוטומטית ב-${scriptDate}` : "התכונות מגרסת ההתקנה"}</Text>
               {newApk ? (
                 <TouchableOpacity style={[s.btn, { alignSelf: "stretch", backgroundColor: "#1d6fa8" }]} onPress={installUpdate}>
@@ -550,7 +551,7 @@ function Main() {
                   </TouchableOpacity>
                 )
               ) : (
-                <Text style={s.sub}>האזנה להתראות לא זמינה בגרסה הזו</Text>
+                <Text style={s.sub}>{LITE ? "בגרסת הלייט אין האזנה להתראות של משוב (כדי ש-Play Protect לא יחסום). התראות מגיעות רק כשהאפליקציה פתוחה." : "האזנה להתראות לא זמינה בגרסה הזו"}</Text>
               )}
               {MashovListener && !postOk ? (
                 <TouchableOpacity style={[s.btn, { backgroundColor: "#8a2a2a" }]} onPress={() => { try { MashovListener.openAppNotificationSettings(); } catch (e) {} }}>
