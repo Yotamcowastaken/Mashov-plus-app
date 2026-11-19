@@ -11,7 +11,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "versionCode": 13,
+      "versionCode": 14,
       "softwareKeyboardLayoutMode": "resize"
     },
     "icon": "./assets/icon.png",
