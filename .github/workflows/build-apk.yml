@@ -30,6 +30,8 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - uses: gradle/actions/setup-gradle@v4
+
       - name: Create Expo project and copy app files
         run: |
           npx --yes create-expo-app@latest build --template blank --no-install
@@ -70,9 +72,10 @@ jobs:
         working-directory: build/android
         # תקלות רשת זמניות אצל Gradle: עד 3 ניסיונות
         run: |
-          for i in 1 2 3; do
-            ./gradlew assembleRelease --no-daemon && exit 0
-            echo "Build attempt $i failed, retrying in 30s"; sleep 30
+          ./gradlew assembleRelease --no-daemon && exit 0
+          for i in 2 3; do
+            echo "Build attempt failed, retrying in 60s with fresh downloads"; sleep 60
+            ./gradlew assembleRelease --no-daemon --refresh-dependencies && exit 0
           done
           exit 1
 
