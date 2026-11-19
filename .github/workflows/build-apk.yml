@@ -68,7 +68,13 @@ jobs:
 
       - name: Build APK
         working-directory: build/android
-        run: ./gradlew assembleRelease --no-daemon
+        # תקלות רשת זמניות אצל Gradle: עד 3 ניסיונות
+        run: |
+          for i in 1 2 3; do
+            ./gradlew assembleRelease --no-daemon && exit 0
+            echo "Build attempt $i failed, retrying in 30s"; sleep 30
+          done
+          exit 1
 
       - name: Name APK
         run: |
