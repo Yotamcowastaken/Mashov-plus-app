@@ -15,6 +15,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         variant: [full, lite]
     steps:
@@ -44,6 +45,8 @@ jobs:
         if: matrix.variant == 'lite'
         working-directory: build
         run: |
+          mkdir -p modules/mashov-listener
+          echo 'export default null;' > modules/mashov-listener/index.js
           node -e '
             const fs = require("fs");
             const m = JSON.parse(fs.readFileSync("app.json", "utf8"));
