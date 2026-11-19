@@ -20,6 +20,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import * as Notifications from "expo-notifications";
 import MashovListener from "./modules/mashov-listener";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +28,67 @@ import { SCRIPT, DEFAULTS, FUNNY_TEXT, ESS_TEXT, PACKS } from "./mp";
 import BUILD_INFO from "./build-info.json";
 
 const STORE_KEY = "mp-store";
+const CRED_KEY = "mp-login";
+
+// סקריפט הכניסה האוטומטית: רץ רק בעמודי ההתחברות של משוב ומשרד החינוך
+function loginScript(c) {
+  return `(function () {
+  var C = ${JSON.stringify(c)};
+  var host = location.hostname;
+  if (host !== "web.mashov.info" && host !== "lgn.edu.gov.il") return;
+  function setVal(el, v) {
+    var proto = Object.getPrototypeOf(el);
+    var d = Object.getOwnPropertyDescriptor(proto, "value");
+    if (d && d.set) d.set.call(el, v); else el.value = v;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    el.dispatchEvent(new Event("blur", { bubbles: true }));
+  }
+  function waitFor(fn, ms, cb) {
+    var t0 = Date.now();
+    (function loop() { var r = fn(); if (r) return cb(r); if (Date.now() - t0 < ms) setTimeout(loop, 250); })();
+  }
+  function btn(txt) {
+    return [].slice.call(document.querySelectorAll("button")).filter(function (b) {
+      return b.offsetParent && b.textContent.trim() === txt;
+    })[0];
+  }
+  if (host === "web.mashov.info") {
+    if (!/login/i.test(location.pathname)) return;
+    if (C.mode === "edu") {
+      waitFor(function () { return document.getElementById("mat-tab-group-0-label-1"); }, 8000, function (tab) {
+        tab.click();
+        waitFor(function () { return btn("הזדהות משרד החינוך"); }, 5000, function (b) { b.click(); });
+      });
+    } else {
+      waitFor(function () { return document.getElementById("passwordInput"); }, 8000, function () {
+        var school = document.getElementById("schoolSelector");
+        if (school && C.school && !school.value) {
+          setVal(school, C.school);
+          waitFor(function () { return document.querySelector("mat-option"); }, 4000, function (o) { o.click(); });
+        }
+        setTimeout(function () {
+          setVal(document.getElementById("usernameInput"), C.user);
+          setVal(document.getElementById("passwordInput"), C.pass);
+          setTimeout(function () { var s = document.getElementById("submitButton"); if (s) s.click(); }, 400);
+        }, 1500);
+      });
+    }
+  } else {
+    // הזדהות אחידה של משרד החינוך
+    if (C.mode !== "edu" || location.pathname.indexOf("/nidp/") < 0) return;
+    var t2 = document.getElementById("tab-2");
+    if (t2) t2.click();
+    waitFor(function () { var p = document.getElementById("password"); return p && p.offsetParent && p; }, 6000, function (p) {
+      setVal(document.getElementById("userName"), C.user);
+      setVal(p, C.pass);
+      var f = p.closest("form");
+      var b = f && f.querySelector("button, input[type=submit]");
+      setTimeout(function () { if (b) b.click(); else if (f) f.submit(); }, 400);
+    });
+  }
+})(); true;`;
+}
 const SCRIPT_KEY = "mp-remote-script";
 const REPO = "Yotamcowastaken/Mashov-plus-app";
 const SCRIPT_URL = `https://raw.githubusercontent.com/${REPO}/main/remote/mp-script.js`;
@@ -103,6 +165,10 @@ function Main() {
   const [sec, setSec] = useState("look");
   const [draft, setDraft] = useState(null); // Map: מקור -> שם מצחיק (עד ששומרים)
   const [kb, setKb] = useState(0);
+  const [cred, setCred] = useState(null); // { mode, user, pass, school, auto }
+  const [credForm, setCredForm] = useState({ mode: "edu", user: "", pass: "", school: "" });
+  const [credMsg, setCredMsg] = useState("");
+  const tries = useRef([]);
   const scrollRef = useRef(null);
   const [ioText, setIoText] = useState("");
   const [ioMsg, setIoMsg] = useState("");
@@ -130,6 +196,10 @@ function Main() {
   const [hideBar, setHideBar] = useState(false);
 
   useEffect(() => {
+    SecureStore.getItemAsync(CRED_KEY).then((v) => {
+      if (!v) return;
+      try { const c = JSON.parse(v); setCred(c); setCredForm({ mode: c.mode, user: c.user, pass: "", school: c.school || "" }); } catch (e) {}
+    }).catch(() => {});
     Promise.all([
       AsyncStorage.getItem(STORE_KEY).catch(() => null),
       AsyncStorage.getItem(SCRIPT_KEY).catch(() => null),
@@ -304,6 +374,18 @@ function Main() {
         thirdPartyCookiesEnabled
         setSupportMultipleWindows={false}
         onMessage={onMessage}
+        onLoadEnd={(e) => {
+          const url = (e && e.nativeEvent && e.nativeEvent.url) || "";
+          if (!cred || cred.auto === false || !web.current) return;
+          const onLogin = /^https:\/\/web\.mashov\.info\/[^?#]*login/i.test(url) || /^https:\/\/lgn\.edu\.gov\.il\/nidp\//i.test(url);
+          if (!onLogin) return;
+          // מגן מנעילת חשבון: לכל היותר 2 ניסיונות ב-3 דקות
+          const now = Date.now();
+          tries.current = tries.current.filter((t) => now - t < 180000);
+          if (tries.current.length >= 2) return;
+          tries.current.push(now);
+          setTimeout(() => web.current && web.current.injectJavaScript(loginScript(cred)), 600);
+        }}
         onNavigationStateChange={(n) => {
           canGoBack.current = n.canGoBack;
           const st = urlsRef.current;
@@ -489,6 +571,56 @@ function Main() {
               {MashovListener && log ? (
                 <Text style={[s.sub, { fontSize: 12 }]}>יומן התראות:{"\n"}{log}</Text>
               ) : null}
+            </Section>
+
+            <Section open={sec === "login"} onToggle={() => setSec(sec === "login" ? "" : "login")} title="🔐 כניסה אוטומטית">
+              <Text style={s.sub}>הפרטים נשמרים רק בטלפון הזה, מוצפנים (Android Keystore). כשמשוב מבקש להתחבר, האפליקציה ממלאת ונכנסת לבד.</Text>
+              {cred ? (
+                <Row label="כניסה אוטומטית פעילה">
+                  <Switch value={cred.auto !== false} onValueChange={(v) => {
+                    const c = { ...cred, auto: v }; setCred(c); SecureStore.setItemAsync(CRED_KEY, JSON.stringify(c)).catch(() => {});
+                  }} />
+                </Row>
+              ) : null}
+              <Text style={s.sub}>דרך ההתחברות</Text>
+              <View style={s.chips}>
+                {[["edu", "🏛️ משרד החינוך"], ["mashov", "משו\"ב"]].map(([id, nm]) => (
+                  <TouchableOpacity key={id} style={[s.chip, credForm.mode === id && s.chipOn]} onPress={() => setCredForm({ ...credForm, mode: id })}>
+                    <Text style={s.btnT}>{nm}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              {credForm.mode === "mashov" ? (
+                <TextInput style={s.input} value={credForm.school} onChangeText={(t) => setCredForm({ ...credForm, school: t })}
+                  onFocus={focusScroll} placeholder="שם בית הספר (כמו שמופיע במשוב)" placeholderTextColor="#777" autoCorrect={false} />
+              ) : null}
+              <TextInput style={s.input} value={credForm.user} onChangeText={(t) => setCredForm({ ...credForm, user: t })}
+                onFocus={focusScroll} placeholder={credForm.mode === "edu" ? "קוד משתמש / ת.ז. של משרד החינוך" : "שם משתמש / ת.ז."}
+                placeholderTextColor="#777" autoCorrect={false} autoCapitalize="none" />
+              <TextInput style={s.input} value={credForm.pass} onChangeText={(t) => setCredForm({ ...credForm, pass: t })}
+                onFocus={focusScroll} placeholder={cred ? "סיסמה (ריק = להשאיר את השמורה)" : "סיסמה"} placeholderTextColor="#777"
+                secureTextEntry autoCorrect={false} autoCapitalize="none" />
+              <View style={s.saveBar}>
+                <TouchableOpacity style={[s.btn, s.saveBtn]} onPress={async () => {
+                  const pass = credForm.pass || (cred && cred.pass) || "";
+                  if (!credForm.user.trim() || !pass) { setCredMsg("צריך שם משתמש וסיסמה"); return; }
+                  const c = { mode: credForm.mode, user: credForm.user.trim(), pass, school: credForm.school.trim(), auto: true };
+                  try { await SecureStore.setItemAsync(CRED_KEY, JSON.stringify(c)); setCred(c); setCredForm({ ...credForm, pass: "" }); tries.current = []; setCredMsg("✓ נשמר. בפעם הבאה שמשוב יבקש להתחבר, זה יקרה לבד"); Keyboard.dismiss(); }
+                  catch (e) { setCredMsg("השמירה נכשלה"); }
+                }}>
+                  <Text style={s.btnT}>💾 שמור</Text>
+                </TouchableOpacity>
+                {cred ? (
+                  <TouchableOpacity style={[s.btn, { flex: 1, backgroundColor: "#8a2a2a" }]} onPress={async () => {
+                    try { await SecureStore.deleteItemAsync(CRED_KEY); } catch (e) {}
+                    setCred(null); setCredForm({ mode: "edu", user: "", pass: "", school: "" }); setCredMsg("הסיסמה נמחקה מהטלפון");
+                  }}>
+                    <Text style={s.btnT}>🗑️ מחק</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+              {credMsg ? <Text style={s.sub}>{credMsg}</Text> : null}
+              <Text style={[s.sub, { fontSize: 12 }]}>אם הסיסמה שגויה, האפליקציה מפסיקה לנסות אחרי 2 ניסיונות כדי לא לנעול את החשבון.</Text>
             </Section>
 
             <Section open={sec === "backup"} onToggle={() => setSec(sec === "backup" ? "" : "backup")} title="💾 גיבוי ושיתוף">
