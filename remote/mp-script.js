@@ -422,6 +422,33 @@ const MP_DEFAULTS = {
       .filter((x) => x.subj && !isNaN(x.g) && x.g >= 0 && x.g <= 100);
     return { table, data };
   }
+  // עמוד ציונים כרשימת כרטיסים (כמו במשוב בטלפון): שם מטלה, תאריך, "מקצוע כיתה", מורה, והציון בצד
+  const DATE_RE = /(\d{1,2})[\/.](\d{1,2})[\/.](\d{2,4})/;
+  function readGradesCards() {
+    const data = [];
+    let firstRow = null;
+    [...document.querySelectorAll(".mp-gr")].forEach((g, i) => {
+      if (g.closest("#mp-avg")) return;
+      let row = g.parentElement, found = null;
+      for (let k = 0; row && k < 8; k++, row = row.parentElement) {
+        if (row.querySelectorAll(".mp-gr").length > 1) break; // הגענו לרשימה כולה
+        if (DATE_RE.test(row.textContent)) { found = row; break; }
+      }
+      if (!found) return;
+      const leaves = [...found.querySelectorAll("*")]
+        .filter((e) => !e.children.length && !e.classList.contains("mp-gr"))
+        .map((e) => origText(e).trim())
+        .filter(Boolean);
+      const di = leaves.findIndex((t) => DATE_RE.test(t));
+      if (di < 0) return;
+      // השורה שאחרי התאריך היא המקצוע; מורידים את הכיתה בסוף ("ח3", "יא'2")
+      const subj = (leaves[di + 1] || "").replace(/\s+[א-ת]{1,2}['"׳״]?\d{0,2}$/, "").trim();
+      if (!subj || DATE_RE.test(subj)) return;
+      data.push({ subj, g: parseFloat(g.textContent.trim()), date: parseDate(leaves[di]), i });
+      if (!firstRow) firstRow = found;
+    });
+    return data.length ? { table: firstRow, data } : null;
+  }
   const mean = (a) => a.reduce((s, x) => s + x.g, 0) / a.length;
   function trend(list) {
     // הממוצע עכשיו לעומת הממוצע בלי הציון האחרון
@@ -437,7 +464,7 @@ const MP_DEFAULTS = {
   function renderAverage() {
     const old = document.getElementById("mp-avg");
     if (!settings.avg) { if (old) old.remove(); avgSig = ""; return; }
-    const r = readGrades();
+    const r = readGrades() || readGradesCards();
     if (!r || r.data.length < 1) { if (old) old.remove(); avgSig = ""; return; }
     const sig = JSON.stringify(r.data.map((x) => [x.subj, x.g, x.date]));
     if (old && sig === avgSig && old.nextElementSibling === r.table) return;
