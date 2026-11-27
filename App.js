@@ -92,7 +92,7 @@ function loginScript(c) {
       if (C.mode === "edu") {
         el.click();
         waitStable(function () { return byText("button", /^הזדהות משרד החינוך$/); }, 8000, 600,
-          function (b) { tried(); b.click(); later(8000, done); }, done);
+          function (b) { b.click(); later(8000, done); }, done); // רק מעבר לדף משרד החינוך, לא נשלחת סיסמה
         return;
       }
       var school = document.getElementById("schoolSelector");
@@ -117,18 +117,24 @@ function loginScript(c) {
   } else {
     // הזדהות אחידה של משרד החינוך
     if (C.mode !== "edu" || location.pathname.indexOf("/nidp/") < 0) return done();
-    waitStable(function () { return document.getElementById("tab-2") || vis(document.getElementById("password")); }, 15000, 1000, function (t2) {
-      if (t2.id === "tab-2") t2.click();
-      waitStable(function () { return vis(document.getElementById("password")); }, 8000, 800, function (p) {
-        fill("userName", C.user, function () {
-          fill("password", C.pass, function () {
-            var f = p.closest("form");
-            var b = f && f.querySelector("button, input[type=submit]");
-            later(500, function () { if (b) submit(b); else if (f) { tried(); f.submit(); } });
-          });
+    // שימו לב: הלשוניות (tab-1/tab-2) הן כפתורי submit, ולחיצה עליהן טוענת את הדף מחדש.
+    // בדרך כלל tab-2 ("קוד משתמש וסיסמה") כבר פעילה והשדות מוצגים, אז ממלאים ישר.
+    waitStable(function () { return vis(document.getElementById("password")); }, 6000, 800, function (p) {
+      fill("userName", C.user, function () {
+        fill("password", C.pass, function () {
+          var f = p.closest("form");
+          var b = f && [].slice.call(f.querySelectorAll("button, input[type=submit]")).filter(function (x) {
+            return vis(x) && !/^tab-/.test(x.id);
+          })[0];
+          later(500, function () { if (b) submit(b); else if (f) { tried(); f.submit(); } });
         });
-      }, done);
-    }, done);
+      });
+    }, function () {
+      // השדות לא הופיעו: עוברים ללשונית קוד משתמש וסיסמה (רק אם היא לא כבר פעילה). הדף ייטען מחדש והסקריפט יוזרק שוב
+      var t2 = document.getElementById("tab-2");
+      if (t2 && !/activeTab/.test(t2.className)) t2.click();
+      done();
+    });
   }
 })(); true;`;
 }
@@ -213,6 +219,7 @@ function Main() {
   const [credForm, setCredForm] = useState({ mode: "edu", user: "", pass: "", school: "" });
   const [credMsg, setCredMsg] = useState("");
   const tries = useRef([]);
+  const injects = useRef([]);
   const scrollRef = useRef(null);
   const [ioText, setIoText] = useState("");
   const [ioMsg, setIoMsg] = useState("");
@@ -364,6 +371,10 @@ function Main() {
     const now = Date.now();
     tries.current = tries.current.filter((t) => now - t < 180000);
     if (tries.current.length >= 2) return;
+    // מגן מלולאת טעינות: לכל היותר 6 הזרקות ב-3 דקות
+    injects.current = injects.current.filter((t) => now - t < 180000);
+    if (injects.current.length >= 6) return;
+    injects.current.push(now);
     setTimeout(() => web.current && web.current.injectJavaScript(loginScript(c)), delay);
   }, []);
   // שינוי שהגיע מתוך הדף (כוכבים ועריכה ב-Essentials): שומרים בלי לשלוח בחזרה
@@ -656,7 +667,7 @@ function Main() {
                   const pass = credForm.pass || (cred && cred.pass) || "";
                   if (!credForm.user.trim() || !pass) { setCredMsg("צריך שם משתמש וסיסמה"); return; }
                   const c = { mode: credForm.mode, user: credForm.user.trim(), pass, school: credForm.school.trim(), auto: true };
-                  try { await SecureStore.setItemAsync(CRED_KEY, JSON.stringify(c)); setCred(c); setCredForm({ ...credForm, pass: "" }); tries.current = []; setCredMsg("✓ נשמר. בפעם הבאה שמשוב יבקש להתחבר, זה יקרה לבד"); Keyboard.dismiss(); }
+                  try { await SecureStore.setItemAsync(CRED_KEY, JSON.stringify(c)); setCred(c); setCredForm({ ...credForm, pass: "" }); tries.current = []; injects.current = []; setCredMsg("✓ נשמר. בפעם הבאה שמשוב יבקש להתחבר, זה יקרה לבד"); Keyboard.dismiss(); }
                   catch (e) { setCredMsg("השמירה נכשלה"); }
                 }}>
                   <Text style={s.btnT}>💾 שמור</Text>
