@@ -32,7 +32,7 @@ const STORE_KEY = "mp-store";
 const CRED_KEY = "mp-login";
 
 // סקריפט הכניסה האוטומטית: רץ רק בעמודי ההתחברות של משוב ומשרד החינוך
-function loginScript(c) {
+function loginScript(c, force) {
   return `(function () {
   var C = ${JSON.stringify(c)};
   var host = location.hostname;
@@ -45,15 +45,19 @@ function loginScript(c) {
     el.dispatchEvent(new Event("change", { bubbles: true }));
     el.dispatchEvent(new Event("blur", { bubbles: true }));
   }
-  // רץ פעם אחת בכל דף (גם אם מזריקים שוב אחרי מעבר בתוך האתר)
-  if (window.__mpLoginRunning) return;
+  // רץ פעם אחת בכל דף (גם אם מזריקים שוב אחרי מעבר בתוך האתר).
+  // לחיצה על כפתור "התחבר" (force) מחליפה סקריפט שכבר מחכה: לכל הרצה יש מספר, והישנה נעצרת
+  var FORCE = ${force ? "true" : "false"};
+  if (window.__mpLoginRunning && !FORCE) return;
   window.__mpLoginRunning = true;
+  var gen = window.__mpLoginGen = (window.__mpLoginGen || 0) + 1;
   var stopped = false;
-  function done() { window.__mpLoginRunning = false; }
+  function dead() { return stopped || gen !== window.__mpLoginGen; }
+  function done() { if (gen === window.__mpLoginGen) window.__mpLoginRunning = false; }
   function post(o) { try { window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch (e) {} }
   // המשתמש נגע במסך או הקליד: עוצרים מיד ונותנים לו להתחבר ידנית (והאפליקציה לא תנסה שוב 10 דקות)
   function onUser(e) {
-    if (!e.isTrusted || stopped || !window.__mpLoginRunning) return;
+    if (!e.isTrusted || dead() || !window.__mpLoginRunning) return;
     if (host === "web.mashov.info" && !/login/i.test(location.pathname)) return; // נגיעה בדשבורד לא קשורה לכניסה
     stopped = true; done(); post({ type: "mp-login-step", step: "user" });
   }
@@ -63,14 +67,14 @@ function loginScript(c) {
   function waitStable(fn, ms, stable, cb, fail) {
     var t0 = Date.now(), last = null, since = 0;
     (function loop() {
-      if (stopped) return;
+      if (dead()) return;
       var r = fn();
       if (r && r === last) { if (Date.now() - since >= stable) return cb(r); }
       else { last = r; since = Date.now(); }
       if (Date.now() - t0 < ms) setTimeout(loop, 100); else if (fail) fail();
     })();
   }
-  function later(ms, f) { setTimeout(function () { if (!stopped) f(); }, ms); }
+  function later(ms, f) { setTimeout(function () { if (!dead()) f(); }, ms); }
   function byText(sel, re) {
     return [].slice.call(document.querySelectorAll(sel)).filter(function (b) {
       return vis(b) && re.test(b.textContent.trim());
@@ -91,6 +95,7 @@ function loginScript(c) {
   function checkResult() {
     var href = location.href;
     setTimeout(function () {
+      if (dead()) return;
       if (location.href !== href && !/login/i.test(location.href)) return;
       var err = [].slice.call(document.querySelectorAll("[class*=message], [class*=error], [role=alert], mat-error"))
         .filter(function (x) { return vis(x) && x.textContent.trim().length > 2; })
@@ -243,6 +248,9 @@ function Main() {
   const [credMsg, setCredMsg] = useState("");
   const flow = useRef({ at: 0, step: "" });
   const injects = useRef([]);
+  const manualUntil = useRef(0);
+  const [onLoginPage, setOnLoginPage] = useState(false);
+  const [manualBusy, setManualBusy] = useState(false);
   const scrollRef = useRef(null);
   const [ioText, setIoText] = useState("");
   const [ioMsg, setIoMsg] = useState("");
@@ -390,8 +398,10 @@ function Main() {
   // flow.step: "" -> "mashov" (נלחץ "הזדהות משרד החינוך") -> "submit" (נלחץ "כניסה") / "user" (המשתמש נגע במסך)
   const tryLogin = useCallback((delay, url) => {
     const c = credRef.current;
-    if (!c || c.auto === false || !web.current) return;
     const now = Date.now();
+    // אחרי לחיצה על "התחבר" במשוב, ממשיכים לדף משרד החינוך גם אם הכניסה האוטומטית כבויה
+    const manual = manualUntil.current > now;
+    if (!c || (c.auto === false && !manual) || !web.current) return;
     const f = flow.current;
     const fresh = !f.at || now - f.at > 600000;
     // בדף משרד החינוך ממשיכים רק את הניסיון שהתחיל עכשיו במשוב
@@ -400,15 +410,27 @@ function Main() {
     // משרד החינוך קיבל את הפרטים, אבל משוב החזיר אותנו לדף ההתחברות
     if (!ministry && f.step === "submit" && now - f.at < 90000 && /login/i.test(url || "")) {
       flow.current = { at: now, step: "failed" };
-      Alert.alert("הכניסה האוטומטית לא הצליחה", "הפרטים נשלחו, אבל משוב החזיר לדף ההתחברות.\n\nאפשר להתחבר ידנית. לא ננסה שוב ב-10 הדקות הקרובות.");
+      Alert.alert("הכניסה האוטומטית לא הצליחה", "הפרטים נשלחו, אבל משוב החזיר לדף ההתחברות.\n\nאפשר להתחבר ידנית או ללחוץ על 🔐 התחבר. אוטומטית לא ננסה שוב ב-10 הדקות הקרובות.");
       return;
     }
     if (ministry ? !midFlow : !fresh) return;
-    // מגן נוסף מלולאת טעינות: לכל היותר 4 הזרקות ב-10 דקות
+    // מגן נוסף מלולאת טעינות: לכל היותר 4 הזרקות ב-10 דקות (לא חל על המשך של לחיצה ידנית)
     injects.current = injects.current.filter((t) => now - t < 600000);
-    if (injects.current.length >= 4) return;
+    if (injects.current.length >= 4 && !manual) return;
     injects.current.push(now);
     setTimeout(() => web.current && web.current.injectJavaScript(loginScript(c)), delay);
+  }, []);
+  // כפתור "התחבר": ממלא את הפרטים השמורים עכשיו, רק כשלוחצים (גם כשהכניסה האוטומטית כבויה או בהפסקה)
+  const manualLogin = useCallback(() => {
+    const c = credRef.current;
+    if (!c) { setSec("login"); setOpen(true); return; }
+    if (!web.current) return;
+    const now = Date.now();
+    manualUntil.current = now + 90000;
+    flow.current = { at: now, step: "" };
+    setManualBusy(true);
+    setTimeout(() => setManualBusy(false), 4000);
+    web.current.injectJavaScript(loginScript(c, true));
   }, []);
   // שינוי שהגיע מתוך הדף (כוכבים ועריכה ב-Essentials): שומרים בלי לשלוח בחזרה
   const onMessage = useCallback((ev) => {
@@ -419,7 +441,7 @@ function Main() {
       flow.current = { at: Date.now(), step: "failed" };
       const why = m.captcha ? "האתר ביקש אימות \"אני לא רובוט\". צריך להשלים אותו ידנית."
         : m.err ? "האתר כתב: " + String(m.err).slice(0, 200) : "האתר לא העביר אותנו הלאה, בלי הודעת שגיאה.";
-      Alert.alert("הכניסה האוטומטית לא הצליחה", why + "\n\nאפשר להתחבר ידנית. לא ננסה שוב ב-10 הדקות הקרובות.");
+      Alert.alert("הכניסה האוטומטית לא הצליחה", why + "\n\nאפשר להתחבר ידנית או ללחוץ על 🔐 התחבר. אוטומטית לא ננסה שוב ב-10 הדקות הקרובות.");
       return;
     }
     const next = { ...(storeRef.current || {}) };
@@ -488,6 +510,7 @@ function Main() {
           if (/^https:\/\/(web\.mashov\.info|lgn\.edu\.gov\.il)\//i.test(url)) tryLogin(200, url);
         }}
         onNavigationStateChange={(n) => {
+          if (n.url) setOnLoginPage(/^https:\/\/web\.mashov\.info\/[^?#]*login/i.test(n.url) || /^https:\/\/lgn\.edu\.gov\.il\/nidp\//i.test(n.url));
           if (n.url && /^https:\/\/web\.mashov\.info\/[^?#]*login/i.test(n.url)) tryLogin(200, n.url);
           canGoBack.current = n.canGoBack;
           const st = urlsRef.current;
@@ -496,6 +519,14 @@ function Main() {
         allowsBackForwardNavigationGestures
       />
 
+      {onLoginPage ? (
+        <View style={s.loginWrap} pointerEvents="box-none">
+          <TouchableOpacity style={[s.loginBtn, manualBusy && { opacity: 0.5 }]} disabled={manualBusy} onPress={manualLogin}
+            accessibilityLabel="התחברות עם הפרטים השמורים">
+            <Text style={s.loginBtnT}>{manualBusy ? "⏳ מתחבר..." : cred ? "🔐 התחבר" : "🔐 שמור פרטי כניסה"}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
       <TouchableOpacity style={s.gear} onPress={() => setOpen(true)} accessibilityLabel="הגדרות">
         <Text style={s.gearText}>⚙️</Text>
       </TouchableOpacity>
@@ -775,6 +806,12 @@ const s = StyleSheet.create({
     backgroundColor: "rgba(40,40,40,0.85)", alignItems: "center", justifyContent: "center",
   },
   gearText: { fontSize: 22 },
+  loginWrap: { position: "absolute", left: 0, right: 0, bottom: 18, alignItems: "center" },
+  loginBtn: {
+    paddingHorizontal: 20, height: 42, borderRadius: 21,
+    backgroundColor: "#1d8fa8", alignItems: "center", justifyContent: "center", elevation: 4,
+  },
+  loginBtnT: { color: "#fff", fontSize: 16, fontWeight: "700" },
   modal: { flex: 1, backgroundColor: "#1a1a1a" },
   head: { flexDirection: "row-reverse", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingBottom: 8 },
   title: { color: "#fff", fontSize: 20, fontWeight: "700" },
