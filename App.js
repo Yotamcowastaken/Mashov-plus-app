@@ -44,48 +44,91 @@ function loginScript(c) {
     el.dispatchEvent(new Event("change", { bubbles: true }));
     el.dispatchEvent(new Event("blur", { bubbles: true }));
   }
-  function waitFor(fn, ms, cb) {
-    var t0 = Date.now();
-    (function loop() { var r = fn(); if (r) return cb(r); if (Date.now() - t0 < ms) setTimeout(loop, 250); })();
+  // רץ פעם אחת בכל דף (גם אם מזריקים שוב אחרי מעבר בתוך האתר)
+  if (window.__mpLoginRunning) return;
+  window.__mpLoginRunning = true;
+  function done() { window.__mpLoginRunning = false; }
+  function vis(el) { return el && el.offsetParent !== null && el; }
+  // מחכה שהאלמנט יופיע ויישאר אותו אלמנט בלי שינוי לזמן "stable" (האתר בונה את הדף בהדרגה)
+  function waitStable(fn, ms, stable, cb, fail) {
+    var t0 = Date.now(), last = null, since = 0;
+    (function loop() {
+      var r = fn();
+      if (r && r === last) { if (Date.now() - since >= stable) return cb(r); }
+      else { last = r; since = Date.now(); }
+      if (Date.now() - t0 < ms) setTimeout(loop, 200); else if (fail) fail();
+    })();
   }
-  function btn(txt) {
-    return [].slice.call(document.querySelectorAll("button")).filter(function (b) {
-      return b.offsetParent && b.textContent.trim() === txt;
+  function later(ms, f) { setTimeout(f, ms); }
+  function byText(sel, re) {
+    return [].slice.call(document.querySelectorAll(sel)).filter(function (b) {
+      return vis(b) && re.test(b.textContent.trim());
     })[0];
   }
+  function tried() {
+    try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: "mp-login-try" })); } catch (e) {}
+  }
+  // ממלא שדה, מחכה, ובודק שהאתר לא מחק את הערך (Angular מאפס לפעמים טופס שנטען מאוחר)
+  function fill(id, v, cb) {
+    var el = document.getElementById(id);
+    if (!el) return cb(false);
+    el.focus(); setVal(el, v);
+    later(700, function () {
+      var e2 = document.getElementById(id);
+      if (e2 && e2.value !== v) { e2.focus(); setVal(e2, v); }
+      cb(true);
+    });
+  }
+  function submit(b) {
+    // מחכה שהכפתור יהיה פעיל (לא disabled) ורק אז לוחץ
+    waitStable(function () { return b && !b.disabled && !b.classList.contains("mat-button-disabled") && b; }, 6000, 300,
+      function (x) { tried(); x.click(); later(8000, done); }, done);
+  }
   if (host === "web.mashov.info") {
-    if (!/login/i.test(location.pathname)) return;
-    if (C.mode === "edu") {
-      waitFor(function () { return document.getElementById("mat-tab-group-0-label-1"); }, 8000, function (tab) {
-        tab.click();
-        waitFor(function () { return btn("הזדהות משרד החינוך"); }, 5000, function (b) { b.click(); });
-      });
-    } else {
-      waitFor(function () { return document.getElementById("passwordInput"); }, 8000, function () {
-        var school = document.getElementById("schoolSelector");
-        if (school && C.school && !school.value) {
-          setVal(school, C.school);
-          waitFor(function () { return document.querySelector("mat-option"); }, 4000, function (o) { o.click(); });
-        }
-        setTimeout(function () {
-          setVal(document.getElementById("usernameInput"), C.user);
-          setVal(document.getElementById("passwordInput"), C.pass);
-          setTimeout(function () { var s = document.getElementById("submitButton"); if (s) s.click(); }, 400);
-        }, 1500);
-      });
-    }
+    // משוב מעביר להתחברות בתוך האתר, לפעמים אחרי שהדף כבר "נטען", אז מחכים לעמוד ההתחברות
+    waitStable(function () { return /login/i.test(location.pathname) && (C.mode === "edu"
+      ? vis(document.getElementById("mat-tab-group-0-label-1")) || byText("[role=tab]", /משרד החינוך/)
+      : vis(document.getElementById("passwordInput"))); }, 20000, 1000, function (el) {
+      if (C.mode === "edu") {
+        el.click();
+        waitStable(function () { return byText("button", /^הזדהות משרד החינוך$/); }, 8000, 600,
+          function (b) { tried(); b.click(); later(8000, done); }, done);
+        return;
+      }
+      var school = document.getElementById("schoolSelector");
+      function rest() {
+        later(800, function () {
+          fill("usernameInput", C.user, function () {
+            fill("passwordInput", C.pass, function () {
+              later(500, function () { submit(document.getElementById("submitButton")); });
+            });
+          });
+        });
+      }
+      if (school && C.school && !school.value) {
+        school.focus(); setVal(school, C.school);
+        // מחכה שרשימת בתי הספר תסתנן ותתייצב, ובוחר את בית הספר המתאים
+        waitStable(function () {
+          var opts = [].slice.call(document.querySelectorAll("mat-option")).filter(vis);
+          return opts.filter(function (o) { return o.textContent.indexOf(C.school) >= 0; })[0] || (opts.length === 1 && opts[0]);
+        }, 8000, 700, function (o) { o.click(); rest(); }, rest);
+      } else rest();
+    }, done);
   } else {
     // הזדהות אחידה של משרד החינוך
-    if (C.mode !== "edu" || location.pathname.indexOf("/nidp/") < 0) return;
-    var t2 = document.getElementById("tab-2");
-    if (t2) t2.click();
-    waitFor(function () { var p = document.getElementById("password"); return p && p.offsetParent && p; }, 6000, function (p) {
-      setVal(document.getElementById("userName"), C.user);
-      setVal(p, C.pass);
-      var f = p.closest("form");
-      var b = f && f.querySelector("button, input[type=submit]");
-      setTimeout(function () { if (b) b.click(); else if (f) f.submit(); }, 400);
-    });
+    if (C.mode !== "edu" || location.pathname.indexOf("/nidp/") < 0) return done();
+    waitStable(function () { return document.getElementById("tab-2") || vis(document.getElementById("password")); }, 15000, 1000, function (t2) {
+      if (t2.id === "tab-2") t2.click();
+      waitStable(function () { return vis(document.getElementById("password")); }, 8000, 800, function (p) {
+        fill("userName", C.user, function () {
+          fill("password", C.pass, function () {
+            var f = p.closest("form");
+            var b = f && f.querySelector("button, input[type=submit]");
+            later(500, function () { if (b) submit(b); else if (f) { tried(); f.submit(); } });
+          });
+        });
+      }, done);
+    }, done);
   }
 })(); true;`;
 }
@@ -311,10 +354,23 @@ function Main() {
 
   const storeRef = useRef(null);
   storeRef.current = store;
+  const credRef = useRef(null);
+  credRef.current = cred;
+  // מזריק את סקריפט הכניסה. מגן מנעילת חשבון: לכל היותר 2 ניסיונות ב-3 דקות
+  // (ניסיון נספר רק כשהסקריפט באמת לוחץ "התחבר", בהודעה mp-login-try)
+  const tryLogin = useCallback((delay) => {
+    const c = credRef.current;
+    if (!c || c.auto === false || !web.current) return;
+    const now = Date.now();
+    tries.current = tries.current.filter((t) => now - t < 180000);
+    if (tries.current.length >= 2) return;
+    setTimeout(() => web.current && web.current.injectJavaScript(loginScript(c)), delay);
+  }, []);
   // שינוי שהגיע מתוך הדף (כוכבים ועריכה ב-Essentials): שומרים בלי לשלוח בחזרה
   const onMessage = useCallback((ev) => {
     let m;
     try { m = JSON.parse(ev.nativeEvent.data); } catch (e) { return; }
+    if (m.type === "mp-login-try") { tries.current.push(Date.now()); return; }
     const next = { ...(storeRef.current || {}) };
     if (m.type === "mp-notify") {
       if (listenRef.current && (storeRef.current || {}).listen !== false) return;
@@ -377,17 +433,11 @@ function Main() {
         onMessage={onMessage}
         onLoadEnd={(e) => {
           const url = (e && e.nativeEvent && e.nativeEvent.url) || "";
-          if (!cred || cred.auto === false || !web.current) return;
-          const onLogin = /^https:\/\/web\.mashov\.info\/[^?#]*login/i.test(url) || /^https:\/\/lgn\.edu\.gov\.il\/nidp\//i.test(url);
-          if (!onLogin) return;
-          // מגן מנעילת חשבון: לכל היותר 2 ניסיונות ב-3 דקות
-          const now = Date.now();
-          tries.current = tries.current.filter((t) => now - t < 180000);
-          if (tries.current.length >= 2) return;
-          tries.current.push(now);
-          setTimeout(() => web.current && web.current.injectJavaScript(loginScript(cred)), 600);
+          // גם בדשבורד: משוב עובר להתחברות בתוך האתר אחרי הטעינה, והסקריפט מחכה לזה
+          if (/^https:\/\/(web\.mashov\.info|lgn\.edu\.gov\.il)\//i.test(url)) tryLogin(1500);
         }}
         onNavigationStateChange={(n) => {
+          if (n.url && /^https:\/\/web\.mashov\.info\/[^?#]*login/i.test(n.url)) tryLogin(800);
           canGoBack.current = n.canGoBack;
           const st = urlsRef.current;
           if (n.url && st[st.length - 1] !== n.url) { st.push(n.url); if (st.length > 30) st.shift(); }
