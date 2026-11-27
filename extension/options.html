@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>שמות מצחיקים – משוב פלוס</title>
+<style>
+  body { font: 15px Arial, sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; }
+  h2 { margin-top: 0; }
+  .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+  .bar input[type=search] { flex: 1; min-width: 160px; padding: 7px; }
+  button { padding: 7px 12px; cursor: pointer; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+  .row input { flex: 1; padding: 7px; font: inherit; }
+  .arrow { color: #888; }
+  .row .del { padding: 7px 10px; }
+  .hint { color: #666; font-size: 13px; margin-top: 14px; line-height: 1.5; }
+  #status { color: #2e7d32; min-width: 70px; }
+</style>
+</head>
+<body>
+  <h2>שמות מצחיקים</h2>
+  <div class="bar">
+    <label><input type="checkbox" id="funny"> פעיל</label>
+    <input type="search" id="filter" placeholder="חיפוש ברשימה…">
+    <button id="add">+ שורה חדשה</button>
+    <button id="reset">↩︎ אפס לברירת מחדל</button>
+    <span id="status"></span>
+  </div>
+  <div class="bar" id="packs"><b>חבילות:</b></div>
+  <div id="rows"></div>
+  <div class="hint">
+    בצד ימין: הטקסט כפי שהוא כתוב במשוב. בצד שמאל: מה להציג במקומו.<br>
+    כלל ארוך חייב להופיע לפני כלל קצר שהוא חלק ממנו (למשל "שיעורי בית אחרונים" לפני "שיעורי בית").<br>
+    שורה שאחד מהצדדים שלה ריק לא נשמרת. שינויים נשמרים אוטומטית ומופיעים במשוב תוך שנייה.
+  </div>
+  <h2 style="margin-top:28px">💾 גיבוי ושיתוף הגדרות</h2>
+  <div class="hint" style="margin-top:0">"ייצוא" מעתיק את כל ההגדרות (כולל השמות המצחיקים והגישה המהירה) כטקסט. שולחים לחבר, והוא מדביק ולוחץ "ייבוא".</div>
+  <textarea id="io" rows="5" style="width:100%;box-sizing:border-box;margin-top:8px;direction:ltr;font:12px monospace"></textarea>
+  <div class="bar">
+    <button id="exp">📤 ייצוא</button>
+    <button id="imp">📥 ייבוא</button>
+    <span id="ioStatus"></span>
+  </div>
+  <script src="defaults.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

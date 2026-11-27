@@ -1,0 +1,187 @@
+/* =====================================================================
+   מצב כהה
+   הפילטר (invert + hue-rotate) לא מסוגל להציג צבעים רוויים, לכן אלמנטים
+   שצבועים באקסנט (.mp-tint) נשארים מחוץ לפילטר, והפילטר מוחל רק על
+   האזורים שסביבם. אם אין אלמנט כזה, הפילטר מוחל על כל ה-body.
+   ===================================================================== */
+html.mp-dark { background: #1a1a1a; color-scheme: dark; }
+
+html.mp-dark body:not(:has(.mp-tint)) {
+  background: #fff;
+  filter: invert(0.9) hue-rotate(180deg);
+}
+html.mp-dark body:has(.mp-tint) {
+  background: #1a1a1a !important;
+  color: #e5e5e5;
+}
+/* אבות של אלמנט האקסנט: רקע כהה ישיר, בלי פילטר */
+html.mp-dark :has(.mp-tint):not(.mp-tint):not(html):not(body) {
+  background-color: #1a1a1a !important;
+  color: #e5e5e5;
+}
+/* האזורים שסביב: מסוננים בנפרד */
+html.mp-dark :has(.mp-tint) > :not(:has(.mp-tint)):not(.mp-tint):not(#mp-fab):not(#mp-panel):not(body) {
+  filter: invert(0.9) hue-rotate(180deg);
+}
+
+/* תמונות ווידאו חוזרים לצבעים רגילים (רק בתוך אזורים מסוננים) */
+html.mp-dark body:not(:has(.mp-tint)) :is(img, video, canvas, picture, iframe, [style*="background-image"]),
+html.mp-dark :has(.mp-tint) > :not(:has(.mp-tint)):not(.mp-tint):not(#mp-fab):not(#mp-panel):not(body) :is(img, video, canvas, picture, iframe, [style*="background-image"]) {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* =====================================================================
+   אקסנט
+   --mp-accent        = הצבע המדויק (לאלמנטים שמחוץ לפילטר)
+   --mp-accent-f      = הצבע אחרי תיקון לפילטר (לקישורים וטאבים)
+   ===================================================================== */
+html.mp-accent .mp-tint {
+  background-color: var(--mp-accent) !important;
+  color: var(--mp-on-accent) !important;
+}
+html.mp-accent .mp-tint * {
+  color: var(--mp-on-accent) !important;
+}
+
+html.mp-accent a:not(.mp-item),
+html.mp-accent .mat-tab-label-active,
+html.mp-accent .mat-mdc-tab.mdc-tab--active .mdc-tab__text-label {
+  color: var(--mp-accent-f) !important;
+}
+html.mp-accent .mat-ink-bar,
+html.mp-accent .mdc-tab-indicator__content--underline {
+  background-color: var(--mp-accent-f) !important;
+  border-color: var(--mp-accent-f) !important;
+}
+
+/* =====================================================================
+   ציונים מעל הסף: זוהר
+   ===================================================================== */
+.mp-glow {
+  color: var(--mp-glow, #ffb300) !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 6px var(--mp-glow, #ffb300), 0 0 14px var(--mp-glow, #ffb300);
+  animation: mp-pulse 2.2s ease-in-out infinite;
+}
+@keyframes mp-pulse {
+  50% {
+    text-shadow: 0 0 12px var(--mp-glow, #ffb300), 0 0 28px var(--mp-glow, #ffb300);
+  }
+}
+
+/* =====================================================================
+   ניווט מהיר (נמצא מחוץ ל-body ולכן אף פעם לא מסונן)
+   ===================================================================== */
+#mp-fab {
+  position: fixed; left: 16px; bottom: 16px; z-index: 2147483000;
+  width: 48px; height: 48px; border-radius: 50%; border: 0; cursor: pointer;
+  background: var(--mp-accent, #1565c0); color: var(--mp-on-accent, #fff); font-size: 22px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.35);
+}
+#mp-panel {
+  position: fixed; left: 16px; bottom: 72px; z-index: 2147483000;
+  width: 300px; max-height: 70vh; overflow: auto; direction: rtl;
+  background: #fff; color: #222; border-radius: 12px; padding: 10px;
+  border: 1px solid #999;
+  box-shadow: 0 4px 18px rgba(0,0,0,.35); font: 14px/1.4 Arial, sans-serif;
+  display: none;
+}
+#mp-panel.open { display: block; }
+#mp-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+#mp-tabs button {
+  flex: 1; padding: 7px; border: 1px solid #bbb; border-radius: 8px; cursor: pointer;
+  background: #f3f6fb; color: #222; font: inherit; font-weight: bold;
+}
+#mp-tabs button.on {
+  background: var(--mp-accent, #1565c0); color: var(--mp-on-accent, #fff);
+  border-color: transparent;
+}
+#mp-search {
+  width: 100%; box-sizing: border-box; padding: 8px 10px; margin-bottom: 8px;
+  border: 1px solid #bbb; border-radius: 8px; font-size: 14px;
+  background: #fff; color: #222;
+}
+#mp-panel details { margin-bottom: 4px; border-radius: 8px; background: #f3f6fb; }
+#mp-panel summary { cursor: pointer; padding: 8px 10px; font-weight: bold; }
+#mp-panel .mp-item {
+  display: block; width: 100%; text-align: right; box-sizing: border-box;
+  padding: 7px 18px; border: 0; background: transparent; cursor: pointer;
+  font: inherit; color: #0d47a1;
+}
+#mp-panel .mp-item:hover { background: #dce8f8; }
+#mp-panel .mp-big {
+  padding: 12px 14px; margin-bottom: 6px; border-radius: 10px; font-size: 16px;
+  font-weight: bold; background: #f3f6fb; border: 1px solid #d5deec;
+}
+#mp-panel .mp-empty { padding: 8px; color: #666; }
+
+/* החלונית במצב כהה */
+html.mp-dark #mp-panel { background: #262626; color: #eee; border-color: #555; }
+html.mp-dark #mp-tabs button { background: #333; color: #eee; border-color: #555; }
+html.mp-dark #mp-tabs button.on { background: var(--mp-accent); color: var(--mp-on-accent); }
+html.mp-dark #mp-search { background: #1a1a1a; color: #eee; border-color: #555; }
+html.mp-dark #mp-panel details { background: #303030; }
+html.mp-dark #mp-panel .mp-item { color: #9ec5ff; }
+html.mp-dark #mp-panel .mp-item:hover { background: #3a3a3a; }
+html.mp-dark #mp-panel .mp-big { background: #303030; border-color: #444; }
+html.mp-dark #mp-panel .mp-empty { color: #aaa; }
+
+/* Essentials: כוכבים ועריכה */
+#mp-panel .mp-row { display: flex; align-items: center; }
+#mp-panel .mp-row .mp-item { flex: 1; }
+#mp-panel .mp-star { border: 0; background: transparent; cursor: pointer; font-size: 18px; padding: 4px 10px; color: #999; }
+#mp-panel .mp-star.on { color: #f5b301; }
+#mp-panel .mp-edit { display: flex; align-items: center; gap: 6px; padding: 6px; margin-bottom: 6px; border-radius: 10px; background: #f3f6fb; }
+#mp-panel .mp-edit span { flex: 1; font-weight: bold; }
+#mp-panel .mp-edit .mp-icon { width: 42px; text-align: center; font-size: 16px; padding: 4px; border: 1px solid #bbb; border-radius: 6px; }
+#mp-panel .mp-edit button, #mp-panel .mp-tools button { border: 1px solid #bbb; background: #fff; border-radius: 6px; cursor: pointer; padding: 4px 8px; font: inherit; color: inherit; }
+#mp-panel .mp-tools { display: flex; gap: 6px; margin-top: 4px; }
+#mp-panel .mp-tools button { flex: 1; padding: 7px; }
+html.mp-dark #mp-panel .mp-edit { background: #303030; }
+html.mp-dark #mp-panel .mp-edit .mp-icon, html.mp-dark #mp-panel .mp-edit button, html.mp-dark #mp-panel .mp-tools button { background: #1a1a1a; color: #eee; border-color: #555; }
+
+/* ---------- "אל תראה לי" ---------- */
+html.mp-hide-grades .mp-gr:not(.mp-reveal) {
+  filter: blur(7px) !important;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ---------- ממוצע ציונים ---------- */
+#mp-avg {
+  direction: rtl; margin: 8px 0 14px; padding: 12px 14px; border-radius: 12px;
+  background: #eef3fb; color: #1b2230; font: 14px/1.4 Arial, sans-serif;
+  border: 1px solid #d5deec;
+}
+#mp-avg .mp-avg-head { display: flex; align-items: center; justify-content: space-between; font-size: 17px; font-weight: bold; margin-bottom: 8px; }
+#mp-avg .mp-avg-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+#mp-avg .mp-avg-chip { display: flex; gap: 8px; align-items: center; background: #fff; border: 1px solid #d5deec; border-radius: 20px; padding: 4px 10px; }
+#mp-avg .mp-avg-n { display: inline-flex; gap: 4px; align-items: center; font-variant-numeric: tabular-nums; }
+#mp-avg i { font-style: normal; font-size: 12px; }
+#mp-avg i.up { color: #1a8a3a; }
+#mp-avg i.down { color: #c62828; }
+#mp-avg i.same { color: #888; }
+
+/* ---------- ערכות נושא ---------- */
+#mp-fx { position: fixed; inset: 0; pointer-events: none; z-index: 2147482000; overflow: hidden; }
+#mp-fx span { position: absolute; }
+html.mp-theme-space #mp-fx span {
+  width: 2px; height: 2px; border-radius: 50%; background: #fff; opacity: .5;
+  box-shadow: 0 0 4px #fff; animation: mp-twinkle ease-in-out infinite;
+}
+@keyframes mp-twinkle { 50% { opacity: .05; } }
+html.mp-theme-winter #mp-fx span { color: #dff3ff; opacity: .55; animation: mp-snow linear infinite; }
+@keyframes mp-snow { to { transform: translate(30px, 110vh) rotate(180deg); } }
+html.mp-theme-neon .mp-tint { box-shadow: 0 0 14px var(--mp-accent), 0 0 30px var(--mp-accent) !important; }
+html.mp-theme-neon #mp-fab, html.mp-theme-neon #mp-tabs button.on { box-shadow: 0 0 14px var(--mp-accent), 0 0 28px var(--mp-accent); }
+html.mp-theme-neon #mp-panel { border-color: var(--mp-accent); box-shadow: 0 0 18px var(--mp-accent); }
+html.mp-theme-neon .mp-tint * { text-shadow: 0 0 6px var(--mp-on-accent); }
+@media (prefers-reduced-motion: reduce) { #mp-fx span { animation: none !important; } }
+
+/* הגדרות בתוך הדף (אייפון) */
+#mp-panel .mp-set-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px 6px; border-bottom: 1px solid #ddd; }
+#mp-panel .mp-set-row select { font: inherit; padding: 4px; border-radius: 6px; }
+#mp-panel .mp-set-row input[type=checkbox] { width: 22px; height: 22px; }
+#mp-panel .mp-set-row input[type=color] { width: 44px; height: 30px; border: 0; padding: 0; background: none; }
+html.mp-dark #mp-panel .mp-set-row { border-color: #444; }
+html.mp-dark #mp-panel .mp-set-row select { background: #1a1a1a; color: #eee; border: 1px solid #555; }

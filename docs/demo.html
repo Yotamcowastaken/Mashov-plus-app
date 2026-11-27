@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl" data-demo="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>הדגמת משוב פלוס</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+/* פלטה: רקע כהה #1a1a1a כמו בתוסף, אקסנט משתנה, זהב לציונים. פריסה: עמודה אחת בטלפון, שתי עמודות במסך רחב. */
+:root {
+  --bg: #eef0f4; --surface: #ffffff; --surface2: #f4f6fa; --text: #1b2230; --muted: #5a6477;
+  --line: #d9dee7; --accent: #1d8fa8; --on-accent: #ffffff; --glow: #a66a00;
+  --font: "Heebo", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  color-scheme: light;
+}
+:root[data-demo="dark"] {
+  --bg: #1a1a1a; --surface: #242424; --surface2: #2d2d2d; --text: #ececec; --muted: #a3a3a3;
+  --line: #3a3a3a; --glow: #ffc107;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 15px/1.5 var(--font); }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+
+.intro h1 { margin: 0 0 4px; font-size: 22px; font-weight: 800; text-wrap: balance; }
+.intro p { margin: 0; color: var(--muted); max-width: 62ch; }
+
+.video { display: flex; justify-content: center; }
+.video video { width: min(100%, 360px); aspect-ratio: 9 / 16; border-radius: 18px; background: #000; border: 1px solid var(--line); }
+.info { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+.info h2 { margin: 0 0 8px; font-size: 19px; font-weight: 800; }
+.info p { margin: 0 0 8px; color: var(--muted); max-width: 65ch; }
+.info ul, .info ol { margin: 0; padding-inline-start: 22px; display: grid; gap: 8px; }
+.info a { color: var(--accent); font-weight: 700; }
+.info code { background: var(--surface2); padding: 1px 6px; border-radius: 6px; direction: ltr; display: inline-block; }
+.info .note { margin-top: 10px; font-size: 13px; }
+.itabs { display: flex; gap: 8px; margin: 4px 0 14px; }
+.itabs button { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface2); font-weight: 700; font-size: 15px; }
+.itabs button[aria-selected="true"] { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+.pick { display: grid; gap: 10px; grid-template-columns: 1fr; margin-bottom: 14px; }
+@media (min-width: 640px) { .pick { grid-template-columns: 1fr 1fr; } }
+.pick > div { background: var(--surface2); border-radius: 12px; padding: 12px; display: grid; gap: 4px; }
+.pick span { color: var(--muted); font-size: 14px; }
+.pick code { justify-self: start; font-size: 12px; }
+.info .mono { direction: ltr; display: inline-block; font-family: ui-monospace, monospace; }
+/* ---------- חלון ההגדרות (מדמה את חלון התוסף) ---------- */
+.settings { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.settings h2 { margin: 0 0 10px; font-size: 15px; font-weight: 700; color: var(--muted); }
+.grid { display: grid; gap: 10px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .grid { grid-template-columns: 1fr 1fr; } }
+.ctl { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--surface2); border-radius: 10px; min-height: 48px; }
+.ctl label { flex: 1; font-weight: 500; }
+.sw { position: relative; width: 46px; height: 26px; flex: none; }
+.sw input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; width: 100%; height: 100%; }
+.sw i { position: absolute; inset: 0; background: var(--line); border-radius: 26px; transition: background .15s; pointer-events: none; }
+.sw i::after { content: ""; position: absolute; top: 3px; inset-inline-start: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.sw input:checked + i { background: var(--accent); }
+.sw input:checked + i::after { transform: translateX(-20px); }
+.sw input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+.swatches { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; padding: 0; }
+.swatch[aria-pressed="true"] { border-color: var(--text); }
+input[type=color] { width: 40px; height: 30px; padding: 0; border: 1px solid var(--line); background: none; border-radius: 6px; }
+input[type=range] { accent-color: var(--accent); width: 130px; }
+.num { min-width: 28px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ---------- אתר הדמה ---------- */
+.site { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.site-head { background: var(--accent); color: var(--on-accent); padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.site-head b { font-size: 16px; font-weight: 700; }
+.site-head span { font-size: 12px; opacity: .85; }
+.site-body { display: grid; grid-template-columns: 1fr; }
+@media (min-width: 760px) { .site-body { grid-template-columns: 250px 1fr; } }
+.menu { margin: 0; padding: 6px; list-style: none; max-height: 300px; overflow-y: auto; border-bottom: 1px solid var(--line); background: var(--surface); }
+@media (min-width: 760px) { .menu { max-height: 560px; border-bottom: 0; border-inline-end: 1px solid var(--line); } }
+.mi { display: block; width: 100%; text-align: start; border: 0; background: transparent; padding: 10px 12px; border-radius: 8px; font-weight: 500; }
+.mi:hover { background: var(--surface2); }
+.mi.active { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.main { padding: 16px; display: grid; gap: 14px; align-content: start; }
+.main h3 { margin: 0; font-size: 18px; font-weight: 800; }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tile { background: var(--surface2); border-radius: 10px; padding: 10px; text-align: center; }
+.tile b { display: block; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.tile span { font-size: 12px; color: var(--muted); }
+.cards { display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .cards { grid-template-columns: 1fr 1fr; } }
+.card { background: var(--surface2); border-radius: 12px; padding: 12px 14px; }
+.card h4 { margin: 0 0 8px; font-size: 14px; font-weight: 700; color: var(--muted); }
+.row { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
+.row:first-of-type { border-top: 0; }
+.row .muted { color: var(--muted); }
+.grade { font-weight: 700; font-variant-numeric: tabular-nums; }
+.grade.glow { color: var(--glow); text-shadow: 0 0 6px var(--glow), 0 0 14px var(--glow); animation: pulse 2.2s ease-in-out infinite; }
+@keyframes pulse { 50% { text-shadow: 0 0 12px var(--glow), 0 0 26px var(--glow); } }
+@media (prefers-reduced-motion: reduce) { .grade.glow { animation: none; } }
+.t[data-o].on { text-decoration: underline dotted var(--muted); text-underline-offset: 4px; cursor: help; }
+
+/* ---------- ניווט מהיר ---------- */
+#fab { position: fixed; inset-inline-start: 16px; bottom: 16px; width: 54px; height: 54px; border-radius: 50%; border: 0; background: var(--accent); color: var(--on-accent); font-size: 24px; box-shadow: 0 3px 12px rgba(0,0,0,.4); z-index: 20; }
+#panel { position: fixed; inset-inline-start: 16px; bottom: 80px; width: min(330px, calc(100vw - 32px)); max-height: 68vh; overflow: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 10px; box-shadow: 0 8px 30px rgba(0,0,0,.45); z-index: 20; display: none; }
+#panel.open { display: block; }
+.tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.tabs button { flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface2); font-weight: 700; }
+.tabs button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: transparent; }
+#q { width: 100%; padding: 9px 10px; margin-bottom: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--text); font: inherit; }
+.big { display: block; width: 100%; text-align: start; padding: 13px 14px; margin-bottom: 6px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface2); font-size: 16px; font-weight: 700; }
+.cat { margin-bottom: 6px; background: var(--surface2); border-radius: 10px; padding: 4px 0; }
+.cat > b { display: block; padding: 6px 12px; font-size: 14px; }
+.cat button { display: block; width: 100%; text-align: start; border: 0; background: transparent; padding: 8px 20px; color: var(--accent); }
+.cat button:hover { background: var(--line); }
+.empty { padding: 8px; color: var(--muted); }
+
+#tip { position: fixed; z-index: 30; background: #111; color: #fff; padding: 6px 10px; border-radius: 8px; font-size: 13px; pointer-events: none; display: none; max-width: 260px; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="intro">
+    <h1>הדגמת משוב פלוס</h1>
+    <p>זה אתר דמה עם נתונים מומצאים, ולא משוב עצמו. צפה בסרטון מהאפליקציה האמיתית, ואז שחק עם ההגדרות למטה כדי לראות מה התוסף עושה באתר האמיתי.</p>
+  </header>
+
+  <section class="video" aria-label="סרטון">
+    <video src="promo.mp4" controls playsinline preload="metadata"></video>
+  </section>
+
+
+  <section class="info" aria-label="מה זה">
+    <h2>מה זה משוב פלוס?</h2>
+    <p>אפליקציה לאנדרואיד (ותוסף למחשב) שפותחת את אתר משוב ומשפרת אותו. היא לא שומרת סיסמה ולא נוגעת בנתונים: מתחברים למשוב כרגיל, והיא רק משנה את התצוגה.</p>
+    <ul class="feat">
+      <li><b>🌙 מצב כהה</b> ו<b>🎨 צבע אקסנט</b> לבחירה</li>
+      <li><b>🌌 ערכות נושא:</b> חלל, ניאון וחורף עם שלג</li>
+      <li><b>📊 ממוצע ציונים</b> כללי ולפי מקצוע, עם חץ עלייה/ירידה</li>
+      <li><b>✨ זוהר</b> לציונים מעל 85, ו<b>🙈 "אל תראה לי"</b> שמטשטש ציונים</li>
+      <li><b>😂 שמות מצחיקים</b> לתפריט, עם חבילות: גיימר, פיראטים, צבא</li>
+      <li><b>⭐ גישה מהירה</b> לדברים החשובים, וחיפוש בכל התפריט</li>
+      <li><b>🔔 התראות:</b> כל הודעה מאפליקציית משוב מגיעה ממשוב פלוס</li>
+      <li><b>💾 גיבוי ושיתוף</b> הגדרות עם חברים, ועדכונים מתוך האפליקציה</li>
+    </ul>
+  </section>
+
+  <section class="info" aria-label="התקנה">
+    <h2>מדריך התקנה</h2>
+    <div class="itabs" role="tablist">
+      <button role="tab" id="t-android" aria-selected="true" aria-controls="p-android">🤖 אנדרואיד</button>
+      <button role="tab" id="t-iphone" aria-selected="false" aria-controls="p-iphone">🍎 אייפון</button>
+    </div>
+
+    <div class="ipanel" id="p-android" role="tabpanel" aria-labelledby="t-android">
+      <p><b>יש שתי גרסאות, בוחרים אחת:</b></p>
+      <div class="pick">
+        <div><b>⭐ מלאה</b><span>כולל התראות מאפליקציית משוב. Play Protect עלול לחסום, צריך לכבות אותו זמנית בהתקנה.</span><code>mashov-plus-build-….apk</code></div>
+        <div><b>🍃 לייט</b><span>הכול חוץ מהתראות ברקע. Play Protect לא אמור לחסום. הכי פשוט לחברים.</span><code>mashov-plus-lite-build-….apk</code></div>
+      </div>
+      <ol class="steps">
+        <li><b>מורידים בטלפון</b> מ<a href="https://github.com/Yotamcowastaken/Mashov-plus-app/releases/latest">דף ההורדות ב-GitHub</a> את הקובץ של הגרסה שבחרתם (המספר הכי גבוה).</li>
+        <li><b>פותחים את הקובץ שירד.</b> אם הטלפון שואל, מאשרים "התקנת אפליקציות ממקור זה".</li>
+        <li><b>אם Play Protect חוסם</b> ("App blocked to protect your device"): Play Store ← התמונה שלכם ← Play Protect ← ⚙️ ← מכבים "סריקת אפליקציות", מתקינים, <b>ומדליקים שוב</b>.</li>
+        <li><b>פותחים ומתחברים</b> למשוב כרגיל. ההגדרות בכפתור ⚙️ בפינה.</li>
+        <li><b>כניסה אוטומטית (לא חובה):</b> ⚙️ ← 🔐 כניסה אוטומטית ← בוחרים משרד החינוך או משו"ב, ממלאים ושומרים. הסיסמה נשמרת רק בטלפון, מוצפנת.</li>
+        <li><b>התראות (רק בגרסה המלאה):</b> ⚙️ ← 🔔 התראות ← "צריך לאשר גישה להתראות" ← משוב פלוס.<br>
+          אם כתוב "For your security, this setting is currently unavailable": הגדרות ← אפליקציות ← משוב פלוס ← ⋮ למעלה ← "Allow restricted settings", ואז שוב.<br>
+          משאירים את אפליקציית משוב הרשמית מותקנת (אפשר להסתיר אותה). היא מקבלת את ההתראות, ומשוב פלוס מעביר אותן.</li>
+        <li><b>עדכונים:</b> כשיוצאת גרסה חדשה, מופיע באפליקציה פס כחול "⬆️ גרסה חדשה זמינה". רוב השיפורים מגיעים לבד גם בלי זה.</li>
+      </ol>
+    </div>
+
+    <div class="ipanel" id="p-iphone" role="tabpanel" aria-labelledby="t-iphone" hidden>
+      <p>באייפון אין אפליקציה (אפל לא מאפשרת), אבל אפשר לקבל כמעט הכול דרך Safari. כל אחד עושה את זה בטלפון שלו, פעם אחת.</p>
+      <ol class="steps">
+        <li><b>מתקינים מה-App Store</b> את האפליקציה החינמית <b>Userscripts</b>.</li>
+        <li><b>מפעילים אותה ב-Safari:</b> הגדרות ← אפליקציות ← Safari ← הרחבות ← Userscripts ← מדליקים, ומאשרים גישה לאתרים (לפחות web.mashov.info).</li>
+        <li><b>פותחים ב-Safari את הקישור הזה:</b><br><a class="mono" href="https://raw.githubusercontent.com/Yotamcowastaken/Mashov-plus-app/main/remote/mashov-plus.user.js">mashov-plus.user.js</a><br>
+          ואז לוחצים על 🧩 (או aA) בשורת הכתובת ← Userscripts ← <b>התקנה</b>.</li>
+        <li><b>נכנסים ל-web.mashov.info ב-Safari</b> ומתחברים כרגיל.</li>
+        <li><b>כפתור ☰ בפינה</b> פותח גישה מהירה, חיפוש בתפריט וטאב <b>⚙️</b> עם כל ההגדרות: מצב כהה, ערכת נושא, צבע, ממוצע, טשטוש, שמות מצחיקים וחבילות.</li>
+        <li><b>טיפ:</b> שיתוף ← "הוספה למסך הבית" יוצר אייקון שפותח את משוב ישר.</li>
+      </ol>
+      <p class="note">מה אין באייפון: התראות וכניסה אוטומטית. הקוד מתעדכן לבד דרך Userscripts.</p>
+    </div>
+  </section>
+
+  <section class="info" aria-label="הדגמה">
+    <h2>נסו בעצמכם</h2>
+    <p>למטה אתר דמה עם נתונים מומצאים. שחקו עם ההגדרות וראו מה משתנה.</p>
+  </section>
+
+  <section class="settings" aria-label="הגדרות התוסף">
+    <h2>חלון התוסף</h2>
+    <div class="grid">
+      <div class="ctl"><label for="dark">מצב כהה</label><span class="sw"><input type="checkbox" id="dark" checked><i></i></span></div>
+      <div class="ctl"><label for="funny">שמות מצחיקים</label><span class="sw"><input type="checkbox" id="funny" checked><i></i></span></div>
+      <div class="ctl">
+        <label id="accl">צבע אקסנט</label>
+        <span class="swatches" id="swatches" role="group" aria-labelledby="accl"></span>
+      </div>
+      <div class="ctl">
+        <label for="glow">זוהר לציונים מעל</label>
+        <input type="range" id="glowMin" min="50" max="100" value="85" aria-label="סף הזוהר">
+        <span class="num" id="glowNum">85</span>
+        <span class="sw"><input type="checkbox" id="glow" checked><i></i></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="site" aria-label="אתר דמה">
+    <div class="site-head"><b>פורטל תלמידים</b><span>אתר דמה</span></div>
+    <div class="site-body">
+      <ul class="menu" id="menu"></ul>
+      <div class="main" id="main"></div>
+    </div>
+  </section>
+
+</div>
+
+<button id="fab" aria-label="ניווט מהיר" aria-expanded="false">☰</button>
+<div id="panel" role="dialog" aria-label="ניווט מהיר">
+  <div class="tabs">
+    <button id="tabEss" aria-pressed="true">⭐ גישה מהירה</button>
+    <button id="tabAll" aria-pressed="false">הכל</button>
+  </div>
+  <input id="q" type="search" placeholder="חיפוש בתפריט…" aria-label="חיפוש בתפריט">
+  <div id="list"></div>
+</div>
+<div id="tip" role="status"></div>
+
+<script>
+/* ---------- נתונים (מומצאים) ---------- */
+const FUNNY = {
+  "לוח מידע":"חדר הבקרה","קוד לזיהוי":"מי אני בכלל?","שחרורית":"כרטיס בריחה",
+  "דואר ומסרונים":"תיבת הבשורות הרעות","דואר שלא נקרא":"הודעות שמתעלמים מהן",
+  "ציונים שוטפים":"רגע האמת","ציונים תקופתיים":"יום הדין","משוב ההצלחה שלי":"מה באמת הצלחתי?",
+  "תעודות":"מסמכי הגורל","קול התלמיד":"הזכות להתלונן","התנהגות בשיעור":"הילד שוב לא התנהג יפה?",
+  "מבט על":"עין הנשר","מרחב קבצים":"המחסן הדיגיטלי","בקשות הצדקה":"מפעל התירוצים",
+  "אירועי התנהגות יומיים":"הדרמות של היום","התנהגות מחוץ לשיעור":"מה קרה בהפסקה?",
+  "מונה אירועים":"מונה החטאים","שעות פרטניות":"טיפול VIP","הערות מעקב":"המחברת השחורה",
+  "מערכת שעות":"לוח הסבל השבועי","המערכת להיום":"הסבל להיום","חומרי לימוד":"אוצר הידע שאף אחד לא קורא",
+  "שיעורי בית":"עבודה בלי שכר","שיעורי בית אחרונים":"העבודות האחרונות בלי שכר",
+  "טפסים מקוונים":"ניירת בלי נייר","אישורי הורים לפעילות":"חתימת אמא להצלה","התאמות":"טיפול מיוחד",
+  "לוח מודעות":"קיר הרכילות","כיתה מקוונת":"זום הייסורים","הקלטות":"ארכיון ההרצאות שלא ראיתי",
+  "משימות Moodle":"המשימות של מודל (שוב)","פרופיל אישי":"הפרצוף שלי","אתר בית הספר":"הבית השני",
+  "כניסה ל-Moodle":"הבור השחור של מודל","לוח מבחנים ואירועים":"לוח הפחדים והחגיגות"
+};
+const MENU = ["לוח מידע","קוד לזיהוי","שחרורית","דואר ומסרונים","ציונים שוטפים","ציונים תקופתיים",
+  "משוב ההצלחה שלי","תעודות","קול התלמיד","התנהגות בשיעור","מבט על","מרחב קבצים","בקשות הצדקה",
+  "אירועי התנהגות יומיים","התנהגות מחוץ לשיעור","מונה אירועים","שעות פרטניות","הערות מעקב",
+  "מערכת שעות","חומרי לימוד","שיעורי בית","טפסים מקוונים","אישורי הורים לפעילות","התאמות",
+  "לוח מודעות","כיתה מקוונת","הקלטות","משימות Moodle","פרופיל אישי","אתר בית הספר",
+  "כניסה ל-Moodle","לוח מבחנים ואירועים"];
+const CATEGORIES = [
+  ["📚 לימודים", /ציון|מבחן|בחינ|שיעורי|מערכת|מקצוע|תעודה|תעודות|בגרות|חומר|משימ|עבודות|הקלטות|כיתה/],
+  ["🕒 נוכחות והתנהגות", /נוכחות|היעדר|איחור|התנהגות|אירוע|אישור|חיסור|הערות מעקב|מונה/],
+  ["✉️ תקשורת", /דואר|הודעות|מודעות|קשר|סקר|משוב|קול התלמיד/],
+  ["👤 פרטים וניהול", /פרטי|פרופיל|טפס|תשלום|הגדרות|קוד|שחרורית|התאמות/],
+];
+const OTHER = "📌 אחר";
+const ESSENTIALS = [["📊", /ציונים שוטפים/], ["⚠️", /^התנהגות בשיעור/], ["📝", /^שיעורי בית$/], ["✉️", /דואר/]];
+const GRADES = [["מתמטיקה",92],["אנגלית",88],["היסטוריה",74],["ביולוגיה",85],["ספרות",79],["פיזיקה",96],["אזרחות",81]];
+const HOMEWORK = [["מתמטיקה","תרגילים 4 עד 9"],["אנגלית","חיבור קצר על הספר"],["ביולוגיה","סיכום פרק הגנטיקה"]];
+const MAIL = ["עדכון על טיול שנתי","שינוי בשעת הטיפוח","מבחן בספרות נדחה"];
+const SCHEDULE = [["08:00","מתמטיקה"],["09:00","אנגלית"],["10:15","היסטוריה"],["11:15","פיזיקה"]];
+
+/* ---------- מצב ---------- */
+const S = { dark: true, funny: true, glow: true, glowMin: 85, accent: "#1d8fa8", active: "התנהגות בשיעור", tab: "ess", open: false };
+const $ = (id) => document.getElementById(id);
+const nm = (o) => S.funny && FUNNY[o] ? FUNNY[o] : o;
+const T = (o) => `<span class="t${S.funny && FUNNY[o] ? " on" : ""}" data-o="${S.funny && FUNNY[o] ? o : ""}">${nm(o)}</span>`;
+const catOf = (t) => { for (const [n, re] of CATEGORIES) if (re.test(t)) return n; return OTHER; };
+
+/* ---------- עיצוב ---------- */
+function theme() {
+  const r = document.documentElement;
+  r.dataset.demo = S.dark ? "dark" : "light";
+  const n = parseInt(S.accent.slice(1), 16), c = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  const lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+  r.style.setProperty("--accent", S.accent);
+  r.style.setProperty("--on-accent", lum > 150 ? "#000" : "#fff");
+}
+
+/* ---------- ציור ---------- */
+function drawMenu() {
+  $("menu").innerHTML = MENU.map((o) =>
+    `<li><button class="mi${o === S.active ? " active" : ""}" data-id="${o}">${T(o)}</button></li>`).join("");
+}
+function drawMain() {
+  const gr = GRADES.map(([s, g]) =>
+    `<div class="row"><span>${s}</span><span class="grade${S.glow && g >= S.glowMin ? " glow" : ""}">${g}</span></div>`).join("");
+  $("main").innerHTML = `
+    <h3>${T(S.active)}</h3>
+    <div class="tiles">
+      <div class="tile"><b>8</b><span>ציונים חדשים</span></div>
+      <div class="tile"><b>3</b><span>הודעות</span></div>
+      <div class="tile"><b>2</b><span>אירועים</span></div>
+    </div>
+    <div class="cards">
+      <div class="card"><h4>${T("ציונים שוטפים")}</h4>${gr}</div>
+      <div class="card"><h4>${T("שיעורי בית אחרונים")}</h4>${HOMEWORK.map(([s, t]) =>
+        `<div class="row"><span>${s}</span><span class="muted">${t}</span></div>`).join("")}</div>
+      <div class="card"><h4>${T("דואר שלא נקרא")}</h4>${MAIL.map((m) =>
+        `<div class="row"><span>${m}</span></div>`).join("")}</div>
+      <div class="card"><h4>${T("המערכת להיום")}</h4>${SCHEDULE.map(([h, s]) =>
+        `<div class="row"><span class="muted">${h}</span><span>${s}</span></div>`).join("")}</div>
+    </div>`;
+}
+function drawList() {
+  const q = $("q").value.trim(), list = $("list");
+  $("tabEss").setAttribute("aria-pressed", S.tab === "ess");
+  $("tabAll").setAttribute("aria-pressed", S.tab === "all");
+  if (S.tab === "ess" && !q) {
+    const items = ESSENTIALS.map(([ic, re]) => [ic, MENU.find((m) => re.test(m))]).filter((x) => x[1]);
+    list.innerHTML = items.map(([ic, m]) => `<button class="big" data-id="${m}">${ic}  ${nm(m)}</button>`).join("");
+    return;
+  }
+  const g = new Map();
+  MENU.filter((m) => !q || m.includes(q) || nm(m).includes(q)).forEach((m) => {
+    const c = catOf(m); if (!g.has(c)) g.set(c, []); g.get(c).push(m);
+  });
+  if (!g.size) { list.innerHTML = '<div class="empty">לא נמצאו תוצאות</div>'; return; }
+  list.innerHTML = [...CATEGORIES.map((c) => c[0]), OTHER].filter((c) => g.has(c)).map((c) =>
+    `<div class="cat"><b>${c}</b>${g.get(c).map((m) => `<button data-id="${m}">${nm(m)}</button>`).join("")}</div>`).join("");
+}
+function drawAll() { theme(); drawMenu(); drawMain(); drawList(); }
+
+/* ---------- tooltip: במקור ---------- */
+let tipTimer;
+function showTip(el) {
+  const o = el.dataset.o;
+  if (!o || !S.funny) return;
+  const tip = $("tip");
+  tip.textContent = "במקור: " + o;
+  tip.style.display = "block";
+  const r = el.getBoundingClientRect(), w = tip.offsetWidth;
+  tip.style.top = Math.max(8, r.top - 38) + "px";
+  tip.style.left = Math.min(innerWidth - w - 8, Math.max(8, r.left + r.width / 2 - w / 2)) + "px";
+  clearTimeout(tipTimer);
+  tipTimer = setTimeout(() => (tip.style.display = "none"), 2200);
+}
+document.addEventListener("mouseover", (e) => { const t = e.target.closest(".t[data-o]"); if (t) showTip(t); });
+document.addEventListener("click", (e) => { const t = e.target.closest(".t[data-o]"); if (t) showTip(t); });
+
+/* ---------- אירועים ---------- */
+function go(id) { S.active = id; drawMenu(); drawMain(); const a = document.querySelector(".mi.active"); if (a) a.scrollIntoView({ block: "nearest" }); }
+$("menu").addEventListener("click", (e) => { const b = e.target.closest(".mi"); if (b) go(b.dataset.id); });
+$("list").addEventListener("click", (e) => { const b = e.target.closest("[data-id]"); if (b) { go(b.dataset.id); setPanel(false); } });
+$("tabEss").onclick = () => { S.tab = "ess"; drawList(); };
+$("tabAll").onclick = () => { S.tab = "all"; drawList(); };
+$("q").oninput = drawList;
+function setPanel(o) { S.open = o; $("panel").classList.toggle("open", o); $("fab").setAttribute("aria-expanded", o); if (o) $("q").focus(); }
+$("fab").onclick = () => setPanel(!S.open);
+document.addEventListener("keydown", (e) => {
+  if (e.altKey && e.key.toLowerCase() === "m") { e.preventDefault(); setPanel(!S.open); }
+  if (e.key === "Escape") setPanel(false);
+});
+$("dark").onchange = (e) => { S.dark = e.target.checked; theme(); };
+$("funny").onchange = (e) => { S.funny = e.target.checked; drawAll(); };
+$("glow").onchange = (e) => { S.glow = e.target.checked; drawMain(); };
+$("glowMin").oninput = (e) => { S.glowMin = +e.target.value; $("glowNum").textContent = S.glowMin; drawMain(); };
+
+const COLORS = ["#1d8fa8", "#e53935", "#8e24aa", "#43a047", "#fb8c00"];
+function drawSwatches() {
+  $("swatches").innerHTML = COLORS.map((c) =>
+    `<button class="swatch" style="background:${c}" data-c="${c}" aria-label="צבע ${c}" aria-pressed="${c === S.accent}"></button>`).join("") +
+    `<input type="color" id="custom" value="${S.accent}" aria-label="צבע מותאם אישית">`;
+  $("custom").oninput = (e) => { S.accent = e.target.value; theme(); document.querySelectorAll(".swatch").forEach((s) => s.setAttribute("aria-pressed", "false")); };
+}
+$("swatches").addEventListener("click", (e) => {
+  const b = e.target.closest(".swatch"); if (!b) return;
+  S.accent = b.dataset.c; theme(); drawSwatches();
+});
+
+drawSwatches();
+drawAll();
+
+/* טאבים של מדריך ההתקנה */
+function itab(which) {
+  ["android", "iphone"].forEach((k) => {
+    $("t-" + k).setAttribute("aria-selected", k === which);
+    $("p-" + k).hidden = k !== which;
+  });
+}
+$("t-android").onclick = () => itab("android");
+$("t-iphone").onclick = () => itab("iphone");
+if (/iPhone|iPad/.test(navigator.userAgent)) itab("iphone");
+</script>
+</body>
+</html>

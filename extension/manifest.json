@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "משוב פלוס",
+  "version": "1.13.0",
+  "description": "מצב כהה, חלוקת התפריט לקטגוריות וניווט מהיר במשוב תלמידים והורים",
+  "permissions": [
+    "storage",
+    "notifications"
+  ],
+  "host_permissions": [
+    "https://web.mashov.info/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://web.mashov.info/*"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "js": [
+        "defaults.js",
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "משוב פלוס",
+    "default_icon": {
+      "128": "icon.png"
+    }
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzzYSJASJtV6TznaOyKH4/Jo9EcyAFofJewfH/ZSQBE9AUOhOhLkXmR8mNOppJxnbDYTy/s1p8byn0qVy3I7ZVQjK0UUIbxWL/a2LwDSFLQXUWjadLspMfZ6uk6Vxja1llWyKJnsJRs4kZ+Hqrr35gQnA1SmoJuUmHS93NBkQdeGbp0bE+xIwnrpbr4BH58+n2B0Oey/ISoGEJQyg8vp/LlXTdRh/Z0UT0lx4iAy4uYOUmumHlxp8vMHt6QirGKMxik9PoemI9IlLcFzdLvLnwUnuDefL6Y9JA5nz70U8TR4GDegFh9L4E4EA41iBZ2tCYw02pSsuD9DBMISlUd8dawIDAQAB",
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "128": "icon.png"
+  }
+}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<style>
+  body { width: 250px; font: 14px Arial, sans-serif; padding: 12px; }
+  h3 { margin: 0 0 10px; }
+  label { display: block; margin: 10px 0; }
+  select, input[type=number] { width: 100%; padding: 4px; box-sizing: border-box; }
+  input[type=color] { width: 100%; height: 34px; padding: 0; border: 1px solid #aaa; }
+  textarea { width: 100%; box-sizing: border-box; direction: rtl; font: 13px Arial; }
+  button { width: 100%; margin: 3px 0; padding: 6px; cursor: pointer; }
+  .hint { font-size: 11px; color: #666; margin-top: 2px; }
+  .row { display: flex; align-items: center; gap: 6px; }
+  .row input[type=number] { width: 70px; }
+</style>
+</head>
+<body>
+  <h3>משוב פלוס</h3>
+  <label>מצב כהה
+    <select id="dark">
+      <option value="on">תמיד כהה</option>
+      <option value="auto">אוטומטי (לפי המחשב)</option>
+      <option value="off">כבוי</option>
+    </select>
+  </label>
+  <label>ערכת נושא
+    <select id="theme">
+      <option value="none">ללא</option>
+      <option value="space">🌌 חלל</option>
+      <option value="neon">💜 ניאון</option>
+      <option value="winter">❄️ חורף</option>
+    </select>
+  </label>
+  <label>צבע אקסנט
+    <input type="color" id="accent">
+  </label>
+  <label><input type="checkbox" id="useAccent"> החל אקסנט על האתר</label>
+  <label class="row"><input type="checkbox" id="glow"> זוהר לציונים מעל
+    <input type="number" id="glowMin" min="0" max="100">
+  </label>
+  <label><input type="checkbox" id="avg"> ממוצע בעמוד הציונים</label>
+  <label><input type="checkbox" id="hideGrades"> 🙈 אל תראה לי (טשטוש ציונים)</label>
+  <label><input type="checkbox" id="funny"> שמות מצחיקים</label>
+  <button id="editFunny">✏️ שמות מצחיקים, חבילות וגיבוי</button>
+  <button id="resetFunny">↩︎ אפס שמות לברירת מחדל</button>
+  <label><input type="checkbox" id="notify"> התראה על הודעות חדשות</label>
+  <label><input type="checkbox" id="nav"> הצג ניווט מהיר</label>
+  <script src="defaults.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

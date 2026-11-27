@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         משוב פלוס
 // @description  מצב כהה, ערכות נושא, ממוצע ציונים, שמות מצחיקים וגישה מהירה במשוב
-// @version      2026.11.20.1057
+// @version      2026.11.27.1528
 // @match        https://web.mashov.info/*
 // @run-at       document-start
 // @inject-into  content
