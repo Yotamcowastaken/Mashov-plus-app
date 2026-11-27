@@ -67,7 +67,7 @@ function loginScript(c) {
       var r = fn();
       if (r && r === last) { if (Date.now() - since >= stable) return cb(r); }
       else { last = r; since = Date.now(); }
-      if (Date.now() - t0 < ms) setTimeout(loop, 200); else if (fail) fail();
+      if (Date.now() - t0 < ms) setTimeout(loop, 100); else if (fail) fail();
     })();
   }
   function later(ms, f) { setTimeout(function () { if (!stopped) f(); }, ms); }
@@ -81,7 +81,7 @@ function loginScript(c) {
     var el = document.getElementById(id);
     if (!el) return cb(false);
     el.focus(); setVal(el, v);
-    later(700, function () {
+    later(300, function () {
       var e2 = document.getElementById(id);
       if (e2 && e2.value !== v) { e2.focus(); setVal(e2, v); }
       cb(true);
@@ -105,26 +105,26 @@ function loginScript(c) {
   }
   function submit(b) {
     // מחכה שהכפתור יהיה פעיל (לא disabled) ורק אז לוחץ, פעם אחת בלבד
-    waitStable(function () { return b && !b.disabled && !b.classList.contains("mat-button-disabled") && b; }, 6000, 300,
+    waitStable(function () { return b && !b.disabled && !b.classList.contains("mat-button-disabled") && b; }, 6000, 200,
       function (x) { post({ type: "mp-login-step", step: "submit" }); x.click(); checkResult(); }, done);
   }
   if (host === "web.mashov.info") {
     // משוב מעביר להתחברות בתוך האתר, לפעמים אחרי שהדף כבר "נטען", אז מחכים לעמוד ההתחברות
     waitStable(function () { return /login/i.test(location.pathname) && (C.mode === "edu"
       ? vis(document.getElementById("mat-tab-group-0-label-1")) || byText("[role=tab]", /משרד החינוך/)
-      : vis(document.getElementById("passwordInput"))); }, 20000, 1000, function (el) {
+      : vis(document.getElementById("passwordInput"))); }, 20000, 400, function (el) {
       if (C.mode === "edu") {
         el.click();
-        waitStable(function () { return byText("button", /^הזדהות משרד החינוך$/); }, 8000, 600,
+        waitStable(function () { return byText("button", /^הזדהות משרד החינוך$/); }, 8000, 300,
           function (b) { post({ type: "mp-login-step", step: "mashov" }); b.click(); later(8000, done); }, done); // רק מעבר לדף משרד החינוך, לא נשלחת סיסמה
         return;
       }
       var school = document.getElementById("schoolSelector");
       function rest() {
-        later(800, function () {
+        later(300, function () {
           fill("usernameInput", C.user, function () {
             fill("passwordInput", C.pass, function () {
-              later(500, function () { submit(document.getElementById("submitButton")); });
+              later(200, function () { submit(document.getElementById("submitButton")); });
             });
           });
         });
@@ -143,14 +143,14 @@ function loginScript(c) {
     if (C.mode !== "edu" || location.pathname.indexOf("/nidp/") < 0) return done();
     // שימו לב: הלשוניות (tab-1/tab-2) הן כפתורי submit, ולחיצה עליהן טוענת את הדף מחדש.
     // בדרך כלל tab-2 ("קוד משתמש וסיסמה") כבר פעילה והשדות מוצגים, אז ממלאים ישר.
-    waitStable(function () { return vis(document.getElementById("password")); }, 6000, 800, function (p) {
+    waitStable(function () { return vis(document.getElementById("password")); }, 6000, 400, function (p) {
       fill("userName", C.user, function () {
         fill("password", C.pass, function () {
           var f = p.closest("form");
           var b = f && [].slice.call(f.querySelectorAll("button, input[type=submit]")).filter(function (x) {
             return vis(x) && !/^tab-/.test(x.id);
           })[0];
-          later(500, function () { if (b) submit(b); else done(); });
+          later(200, function () { if (b) submit(b); else done(); });
         });
       });
     }, function () {
@@ -485,10 +485,10 @@ function Main() {
         onLoadEnd={(e) => {
           const url = (e && e.nativeEvent && e.nativeEvent.url) || "";
           // גם בדשבורד: משוב עובר להתחברות בתוך האתר אחרי הטעינה, והסקריפט מחכה לזה
-          if (/^https:\/\/(web\.mashov\.info|lgn\.edu\.gov\.il)\//i.test(url)) tryLogin(1500, url);
+          if (/^https:\/\/(web\.mashov\.info|lgn\.edu\.gov\.il)\//i.test(url)) tryLogin(200, url);
         }}
         onNavigationStateChange={(n) => {
-          if (n.url && /^https:\/\/web\.mashov\.info\/[^?#]*login/i.test(n.url)) tryLogin(800, n.url);
+          if (n.url && /^https:\/\/web\.mashov\.info\/[^?#]*login/i.test(n.url)) tryLogin(200, n.url);
           canGoBack.current = n.canGoBack;
           const st = urlsRef.current;
           if (n.url && st[st.length - 1] !== n.url) { st.push(n.url); if (st.length > 30) st.shift(); }
