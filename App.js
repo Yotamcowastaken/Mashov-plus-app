@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Alert,
   AppState,
   Dimensions,
   Keyboard,
@@ -47,26 +48,33 @@ function loginScript(c) {
   // רץ פעם אחת בכל דף (גם אם מזריקים שוב אחרי מעבר בתוך האתר)
   if (window.__mpLoginRunning) return;
   window.__mpLoginRunning = true;
+  var stopped = false;
   function done() { window.__mpLoginRunning = false; }
+  function post(o) { try { window.ReactNativeWebView.postMessage(JSON.stringify(o)); } catch (e) {} }
+  // המשתמש נגע במסך או הקליד: עוצרים מיד ונותנים לו להתחבר ידנית (והאפליקציה לא תנסה שוב 10 דקות)
+  function onUser(e) {
+    if (!e.isTrusted || stopped || !window.__mpLoginRunning) return;
+    if (host === "web.mashov.info" && !/login/i.test(location.pathname)) return; // נגיעה בדשבורד לא קשורה לכניסה
+    stopped = true; done(); post({ type: "mp-login-step", step: "user" });
+  }
+  ["touchstart", "mousedown", "keydown"].forEach(function (t) { document.addEventListener(t, onUser, true); });
   function vis(el) { return el && el.offsetParent !== null && el; }
   // מחכה שהאלמנט יופיע ויישאר אותו אלמנט בלי שינוי לזמן "stable" (האתר בונה את הדף בהדרגה)
   function waitStable(fn, ms, stable, cb, fail) {
     var t0 = Date.now(), last = null, since = 0;
     (function loop() {
+      if (stopped) return;
       var r = fn();
       if (r && r === last) { if (Date.now() - since >= stable) return cb(r); }
       else { last = r; since = Date.now(); }
       if (Date.now() - t0 < ms) setTimeout(loop, 200); else if (fail) fail();
     })();
   }
-  function later(ms, f) { setTimeout(f, ms); }
+  function later(ms, f) { setTimeout(function () { if (!stopped) f(); }, ms); }
   function byText(sel, re) {
     return [].slice.call(document.querySelectorAll(sel)).filter(function (b) {
       return vis(b) && re.test(b.textContent.trim());
     })[0];
-  }
-  function tried() {
-    try { window.ReactNativeWebView.postMessage(JSON.stringify({ type: "mp-login-try" })); } catch (e) {}
   }
   // ממלא שדה, מחכה, ובודק שהאתר לא מחק את הערך (Angular מאפס לפעמים טופס שנטען מאוחר)
   function fill(id, v, cb) {
@@ -79,10 +87,26 @@ function loginScript(c) {
       cb(true);
     });
   }
+  // אחרי הלחיצה: אם עדיין באותו דף אחרי 8 שניות, הכניסה לא עברה. מדווחים לאפליקציה מה רואים בדף
+  function checkResult() {
+    var href = location.href;
+    setTimeout(function () {
+      if (location.href !== href && !/login/i.test(location.href)) return;
+      var err = [].slice.call(document.querySelectorAll("[class*=message], [class*=error], [role=alert], mat-error"))
+        .filter(function (x) { return vis(x) && x.textContent.trim().length > 2; })
+        .map(function (x) { return x.textContent.trim(); }).join(" | ").slice(0, 200);
+      var captcha = [].slice.call(document.querySelectorAll("iframe[src*='recaptcha'][src*='bframe']")).some(function (f) {
+        var r = f.getBoundingClientRect(), c = f.closest("div[style*='visibility']");
+        return r.width > 100 && r.height > 100 && (!c || getComputedStyle(c).visibility !== "hidden");
+      });
+      post({ type: "mp-login-result", err: err, captcha: captcha });
+      done();
+    }, 8000);
+  }
   function submit(b) {
-    // מחכה שהכפתור יהיה פעיל (לא disabled) ורק אז לוחץ
+    // מחכה שהכפתור יהיה פעיל (לא disabled) ורק אז לוחץ, פעם אחת בלבד
     waitStable(function () { return b && !b.disabled && !b.classList.contains("mat-button-disabled") && b; }, 6000, 300,
-      function (x) { tried(); x.click(); later(8000, done); }, done);
+      function (x) { post({ type: "mp-login-step", step: "submit" }); x.click(); checkResult(); }, done);
   }
   if (host === "web.mashov.info") {
     // משוב מעביר להתחברות בתוך האתר, לפעמים אחרי שהדף כבר "נטען", אז מחכים לעמוד ההתחברות
@@ -92,7 +116,7 @@ function loginScript(c) {
       if (C.mode === "edu") {
         el.click();
         waitStable(function () { return byText("button", /^הזדהות משרד החינוך$/); }, 8000, 600,
-          function (b) { b.click(); later(8000, done); }, done); // רק מעבר לדף משרד החינוך, לא נשלחת סיסמה
+          function (b) { post({ type: "mp-login-step", step: "mashov" }); b.click(); later(8000, done); }, done); // רק מעבר לדף משרד החינוך, לא נשלחת סיסמה
         return;
       }
       var school = document.getElementById("schoolSelector");
@@ -126,13 +150,12 @@ function loginScript(c) {
           var b = f && [].slice.call(f.querySelectorAll("button, input[type=submit]")).filter(function (x) {
             return vis(x) && !/^tab-/.test(x.id);
           })[0];
-          later(500, function () { if (b) submit(b); else if (f) { tried(); f.submit(); } });
+          later(500, function () { if (b) submit(b); else done(); });
         });
       });
     }, function () {
-      // השדות לא הופיעו: עוברים ללשונית קוד משתמש וסיסמה (רק אם היא לא כבר פעילה). הדף ייטען מחדש והסקריפט יוזרק שוב
-      var t2 = document.getElementById("tab-2");
-      if (t2 && !/activeTab/.test(t2.className)) t2.click();
+      // השדות לא הופיעו. לא לוחצים על הלשוניות (הן טוענות את הדף מחדש), רק מדווחים
+      post({ type: "mp-login-result", err: "לא נמצאו השדות של קוד משתמש וסיסמה בדף משרד החינוך" });
       done();
     });
   }
@@ -218,7 +241,7 @@ function Main() {
   const [cred, setCred] = useState(null); // { mode, user, pass, school, auto }
   const [credForm, setCredForm] = useState({ mode: "edu", user: "", pass: "", school: "" });
   const [credMsg, setCredMsg] = useState("");
-  const tries = useRef([]);
+  const flow = useRef({ at: 0, step: "" });
   const injects = useRef([]);
   const scrollRef = useRef(null);
   const [ioText, setIoText] = useState("");
@@ -363,17 +386,27 @@ function Main() {
   storeRef.current = store;
   const credRef = useRef(null);
   credRef.current = cred;
-  // מזריק את סקריפט הכניסה. מגן מנעילת חשבון: לכל היותר 2 ניסיונות ב-3 דקות
-  // (ניסיון נספר רק כשהסקריפט באמת לוחץ "התחבר", בהודעה mp-login-try)
-  const tryLogin = useCallback((delay) => {
+  // מזריק את סקריפט הכניסה. ניסיון אחד בלבד, ואז הפסקה של 10 דקות (גם כדי שאפשר יהיה להתחבר ידנית):
+  // flow.step: "" -> "mashov" (נלחץ "הזדהות משרד החינוך") -> "submit" (נלחץ "כניסה") / "user" (המשתמש נגע במסך)
+  const tryLogin = useCallback((delay, url) => {
     const c = credRef.current;
     if (!c || c.auto === false || !web.current) return;
     const now = Date.now();
-    tries.current = tries.current.filter((t) => now - t < 180000);
-    if (tries.current.length >= 2) return;
-    // מגן מלולאת טעינות: לכל היותר 6 הזרקות ב-3 דקות
-    injects.current = injects.current.filter((t) => now - t < 180000);
-    if (injects.current.length >= 6) return;
+    const f = flow.current;
+    const fresh = !f.at || now - f.at > 600000;
+    // בדף משרד החינוך ממשיכים רק את הניסיון שהתחיל עכשיו במשוב
+    const midFlow = f.step === "mashov" && now - f.at < 90000;
+    const ministry = /^https:\/\/lgn\.edu\.gov\.il\//i.test(url || "");
+    // משרד החינוך קיבל את הפרטים, אבל משוב החזיר אותנו לדף ההתחברות
+    if (!ministry && f.step === "submit" && now - f.at < 90000 && /login/i.test(url || "")) {
+      flow.current = { at: now, step: "failed" };
+      Alert.alert("הכניסה האוטומטית לא הצליחה", "הפרטים נשלחו, אבל משוב החזיר לדף ההתחברות.\n\nאפשר להתחבר ידנית. לא ננסה שוב ב-10 הדקות הקרובות.");
+      return;
+    }
+    if (ministry ? !midFlow : !fresh) return;
+    // מגן נוסף מלולאת טעינות: לכל היותר 4 הזרקות ב-10 דקות
+    injects.current = injects.current.filter((t) => now - t < 600000);
+    if (injects.current.length >= 4) return;
     injects.current.push(now);
     setTimeout(() => web.current && web.current.injectJavaScript(loginScript(c)), delay);
   }, []);
@@ -381,7 +414,14 @@ function Main() {
   const onMessage = useCallback((ev) => {
     let m;
     try { m = JSON.parse(ev.nativeEvent.data); } catch (e) { return; }
-    if (m.type === "mp-login-try") { tries.current.push(Date.now()); return; }
+    if (m.type === "mp-login-step") { flow.current = { at: Date.now(), step: String(m.step || "") }; return; }
+    if (m.type === "mp-login-result") {
+      flow.current = { at: Date.now(), step: "failed" };
+      const why = m.captcha ? "האתר ביקש אימות \"אני לא רובוט\". צריך להשלים אותו ידנית."
+        : m.err ? "האתר כתב: " + String(m.err).slice(0, 200) : "האתר לא העביר אותנו הלאה, בלי הודעת שגיאה.";
+      Alert.alert("הכניסה האוטומטית לא הצליחה", why + "\n\nאפשר להתחבר ידנית. לא ננסה שוב ב-10 הדקות הקרובות.");
+      return;
+    }
     const next = { ...(storeRef.current || {}) };
     if (m.type === "mp-notify") {
       if (listenRef.current && (storeRef.current || {}).listen !== false) return;
@@ -445,10 +485,10 @@ function Main() {
         onLoadEnd={(e) => {
           const url = (e && e.nativeEvent && e.nativeEvent.url) || "";
           // גם בדשבורד: משוב עובר להתחברות בתוך האתר אחרי הטעינה, והסקריפט מחכה לזה
-          if (/^https:\/\/(web\.mashov\.info|lgn\.edu\.gov\.il)\//i.test(url)) tryLogin(1500);
+          if (/^https:\/\/(web\.mashov\.info|lgn\.edu\.gov\.il)\//i.test(url)) tryLogin(1500, url);
         }}
         onNavigationStateChange={(n) => {
-          if (n.url && /^https:\/\/web\.mashov\.info\/[^?#]*login/i.test(n.url)) tryLogin(800);
+          if (n.url && /^https:\/\/web\.mashov\.info\/[^?#]*login/i.test(n.url)) tryLogin(800, n.url);
           canGoBack.current = n.canGoBack;
           const st = urlsRef.current;
           if (n.url && st[st.length - 1] !== n.url) { st.push(n.url); if (st.length > 30) st.shift(); }
@@ -667,7 +707,7 @@ function Main() {
                   const pass = credForm.pass || (cred && cred.pass) || "";
                   if (!credForm.user.trim() || !pass) { setCredMsg("צריך שם משתמש וסיסמה"); return; }
                   const c = { mode: credForm.mode, user: credForm.user.trim(), pass, school: credForm.school.trim(), auto: true };
-                  try { await SecureStore.setItemAsync(CRED_KEY, JSON.stringify(c)); setCred(c); setCredForm({ ...credForm, pass: "" }); tries.current = []; injects.current = []; setCredMsg("✓ נשמר. בפעם הבאה שמשוב יבקש להתחבר, זה יקרה לבד"); Keyboard.dismiss(); }
+                  try { await SecureStore.setItemAsync(CRED_KEY, JSON.stringify(c)); setCred(c); setCredForm({ ...credForm, pass: "" }); flow.current = { at: 0, step: "" }; injects.current = []; setCredMsg("✓ נשמר. בפעם הבאה שמשוב יבקש להתחבר, זה יקרה לבד"); Keyboard.dismiss(); }
                   catch (e) { setCredMsg("השמירה נכשלה"); }
                 }}>
                   <Text style={s.btnT}>💾 שמור</Text>
