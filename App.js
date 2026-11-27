@@ -247,7 +247,6 @@ function Main() {
   const [credForm, setCredForm] = useState({ mode: "edu", user: "", pass: "", school: "" });
   const [credMsg, setCredMsg] = useState("");
   const flow = useRef({ at: 0, step: "" });
-  const injects = useRef([]);
   const manualUntil = useRef(0);
   const [onLoginPage, setOnLoginPage] = useState(false);
   const [manualBusy, setManualBusy] = useState(false);
@@ -413,11 +412,9 @@ function Main() {
       Alert.alert("הכניסה האוטומטית לא הצליחה", "הפרטים נשלחו, אבל משוב החזיר לדף ההתחברות.\n\nאפשר להתחבר ידנית או ללחוץ על 🔐 התחבר. אוטומטית לא ננסה שוב ב-10 הדקות הקרובות.");
       return;
     }
+    // ההגנה מלולאות היא ה-flow: הסקריפט לוחץ על משהו רק בעמוד התחברות, ואחרי לחיצה אין ניסיון חדש 10 דקות.
+    // (בלי מגבלת הזרקות: היא ספרה גם טעינות רגילות של משוב ונגמרה לפני שהגענו לדף משרד החינוך)
     if (ministry ? !midFlow : !fresh) return;
-    // מגן נוסף מלולאת טעינות: לכל היותר 4 הזרקות ב-10 דקות (לא חל על המשך של לחיצה ידנית)
-    injects.current = injects.current.filter((t) => now - t < 600000);
-    if (injects.current.length >= 4 && !manual) return;
-    injects.current.push(now);
     setTimeout(() => web.current && web.current.injectJavaScript(loginScript(c)), delay);
   }, []);
   // כפתור "התחבר": ממלא את הפרטים השמורים עכשיו, רק כשלוחצים (גם כשהכניסה האוטומטית כבויה או בהפסקה)
@@ -738,7 +735,7 @@ function Main() {
                   const pass = credForm.pass || (cred && cred.pass) || "";
                   if (!credForm.user.trim() || !pass) { setCredMsg("צריך שם משתמש וסיסמה"); return; }
                   const c = { mode: credForm.mode, user: credForm.user.trim(), pass, school: credForm.school.trim(), auto: true };
-                  try { await SecureStore.setItemAsync(CRED_KEY, JSON.stringify(c)); setCred(c); setCredForm({ ...credForm, pass: "" }); flow.current = { at: 0, step: "" }; injects.current = []; setCredMsg("✓ נשמר. בפעם הבאה שמשוב יבקש להתחבר, זה יקרה לבד"); Keyboard.dismiss(); }
+                  try { await SecureStore.setItemAsync(CRED_KEY, JSON.stringify(c)); setCred(c); setCredForm({ ...credForm, pass: "" }); flow.current = { at: 0, step: "" }; setCredMsg("✓ נשמר. בפעם הבאה שמשוב יבקש להתחבר, זה יקרה לבד"); Keyboard.dismiss(); }
                   catch (e) { setCredMsg("השמירה נכשלה"); }
                 }}>
                   <Text style={s.btnT}>💾 שמור</Text>
