@@ -406,12 +406,20 @@ function Main() {
     // בדף משרד החינוך ממשיכים רק את הניסיון שהתחיל עכשיו במשוב
     const midFlow = f.step === "mashov" && now - f.at < 90000;
     const ministry = /^https:\/\/lgn\.edu\.gov\.il\//i.test(url || "");
-    // משרד החינוך קיבל את הפרטים, אבל משוב החזיר אותנו לדף ההתחברות
+    // אחרי שליחה, משוב עובר לרגע דרך דף ההתחברות בדרך לדשבורד. מתריעים רק אם אחרי 7 שניות עדיין שם
     if (!ministry && f.step === "submit" && now - f.at < 90000 && /login/i.test(url || "")) {
-      flow.current = { at: now, step: "failed" };
-      Alert.alert("הכניסה האוטומטית לא הצליחה", "הפרטים נשלחו, אבל משוב החזיר לדף ההתחברות.\n\nאפשר להתחבר ידנית או ללחוץ על 🔐 התחבר. אוטומטית לא ננסה שוב ב-10 הדקות הקרובות.");
+      flow.current = { at: f.at, step: "verifying" };
+      setTimeout(() => {
+        const st = urlsRef.current;
+        const cur = st[st.length - 1] || "";
+        if (flow.current.step !== "verifying") return;
+        flow.current = { at: Date.now(), step: /^https:\/\/web\.mashov\.info\/[^?#]*login/i.test(cur) ? "failed" : "done" };
+        if (flow.current.step === "failed")
+          Alert.alert("הכניסה האוטומטית לא הצליחה", "הפרטים נשלחו, אבל משוב החזיר לדף ההתחברות.\n\nאפשר להתחבר ידנית או ללחוץ על 🔐 התחבר. אוטומטית לא ננסה שוב ב-10 הדקות הקרובות.");
+      }, 7000);
       return;
     }
+    if (!ministry && f.step === "verifying") return;
     // ההגנה מלולאות היא ה-flow: הסקריפט לוחץ על משהו רק בעמוד התחברות, ואחרי לחיצה אין ניסיון חדש 10 דקות.
     // (בלי מגבלת הזרקות: היא ספרה גם טעינות רגילות של משוב ונגמרה לפני שהגענו לדף משרד החינוך)
     if (ministry ? !midFlow : !fresh) return;
